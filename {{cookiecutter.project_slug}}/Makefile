@@ -44,7 +44,7 @@ test-unit:
 	uv run pytest tests/unit -v
 
 eval:
-	npx --yes promptfoo@latest eval --config tests/evals/promptfoo.yaml
+	uv run python tests/evals/run_eval.py
 
 deploy-dev:
 	uv run python deployment/deploy.py --env dev
