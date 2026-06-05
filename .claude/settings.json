@@ -1,37 +1,27 @@
 {
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/pre-commit-checks.sh",
+            "if": "Bash(git commit *)",
+            "timeout": 30,
+            "statusMessage": "Checking markdown and workflow syntax..."
+          }
+        ]
+      }
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "autoCompactEnabled": true,
   "permissions": {
+    "defaultMode": "auto",
+    "additionalDirectories": ["~/.claude"],
     "allow": [
-      "Bash(git *)",
-      "Bash(gh *)",
-      "Bash(uv *)",
-      "Bash(npm *)",
-      "Bash(npx *)",
-      "Bash(node *)",
-      "Bash(python *)",
-      "Bash(python3 *)",
-      "Bash(ruff *)",
-      "Bash(pyright *)",
-      "Bash(pre-commit *)",
-      "Bash(cookiecutter *)",
-      "Bash(brew *)",
-      "Bash(pipx *)",
-      "Bash(gcloud *)",
-      "Bash(gsutil *)",
-      "Bash(mkdir *)",
-      "Bash(cp *)",
-      "Bash(mv *)",
-      "Bash(touch *)",
-      "Bash(chmod *)",
-      "Bash(open *)",
-      "Bash(source *)",
-      "Bash(export *)",
-      "Bash(ls *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(cat *)",
-      "Bash(echo *)",
-      "Bash(which *)",
-      "Bash(GIT_AUTHOR_NAME=* git *)",
+      "Bash(*)",
       "Read(**)",
       "Write(**)",
       "Edit(**)"
@@ -45,13 +35,34 @@
       "Edit(.env.*)",
       "Read(*.pem)",
       "Read(*.key)",
-      "Read(gcp-sa-key.json)",
+      "Read(secrets/**)",
+      "Read(**/*.secret)",
       "Write(*.pem)",
       "Write(*.key)",
-      "Bash(rm -rf *)",
+      "Write(secrets/**)",
+      "Write(**/*.secret)",
+      "Bash(rm *)",
       "Bash(curl *)",
       "Bash(wget *)",
-      "Bash(chmod 777 *)"
+      "Bash(nc *)",
+      "Bash(ncat *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(chmod 777 *)",
+      "Bash(sudo *)",
+      "Bash(kill *)",
+      "Bash(killall *)",
+      "Bash(pkill *)",
+      "Bash(dd *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(crontab *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git checkout -- *)"
     ]
   }
 }
