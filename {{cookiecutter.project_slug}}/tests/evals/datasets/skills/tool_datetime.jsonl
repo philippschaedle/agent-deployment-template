@@ -1,0 +1,3 @@
+{"description": "datetime: current date and time", "vars": {"prompt": "What is today's date and time?"}, "assert": [{"type": "contains-any", "value": ["date", "time", "UTC", "today"]}]}
+{"description": "datetime: current year", "vars": {"prompt": "What year is it right now?"}, "assert": [{"type": "contains-any", "value": ["2024", "2025", "2026", "2027"]}]}
+{"description": "datetime: UTC time request", "vars": {"prompt": "Tell me the current UTC time"}, "assert": [{"type": "contains-any", "value": ["UTC", "time", ":"]}]}

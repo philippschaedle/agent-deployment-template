@@ -22,6 +22,8 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-yaml
+        # Exclude GitHub Actions workflows (contain Jinja2 templates that YAML parser can't handle)
+        exclude: \.github/workflows/.*\.yml$
       - id: check-json
       - id: check-toml
       - id: end-of-file-fixer

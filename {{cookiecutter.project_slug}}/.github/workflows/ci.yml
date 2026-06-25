@@ -63,3 +63,28 @@ jobs:
         with:
           name: coverage-report
           path: htmlcov/
+
+  integration-test:
+    name: Integration tests (mocked LLM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "{{cookiecutter.python_version}}"
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - run: uv sync
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration -v --tb=short
+        env:
+          # Use Google provider so resolve_model() returns a plain string —
+          # the Runner is mocked before any network call is made.
+          MODEL_PROVIDER: google

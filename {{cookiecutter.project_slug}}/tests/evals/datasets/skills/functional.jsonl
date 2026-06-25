@@ -1,0 +1,5 @@
+{"description": "capability inquiry", "vars": {"prompt": "What can you help me with?"}, "assert": [{"type": "contains-any", "value": ["help", "assist", "can do", "able to"]}]}
+{"description": "factual: capital of France", "vars": {"prompt": "What is the capital of France?"}, "assert": [{"type": "contains", "value": "Paris"}]}
+{"description": "structured list", "vars": {"prompt": "List 3 benefits of regular exercise"}, "assert": [{"type": "contains-any", "value": ["weight", "disease", "mood", "energy", "sleep", "health", "strength"]}]}
+{"description": "factual: basic arithmetic", "vars": {"prompt": "What is 7 multiplied by 8?"}, "assert": [{"type": "contains", "value": "56"}]}
+{"description": "factual: water boiling point", "vars": {"prompt": "At what temperature does water boil at sea level in Celsius?"}, "assert": [{"type": "contains", "value": "100"}]}

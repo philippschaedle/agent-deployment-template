@@ -1,4 +1,4 @@
-.PHONY: install dev lint format typecheck test test-unit eval \
+.PHONY: install dev lint format typecheck test test-unit test-integration eval \
         deploy-dev deploy-prod logs traces setup-gcp pre-commit clean help
 
 -include .env
@@ -13,9 +13,10 @@ help:
 	@echo "  lint         Run ruff lint check"
 	@echo "  format       Run ruff formatter"
 	@echo "  typecheck    Run pyright type checker"
-	@echo "  test         Run all unit tests with coverage"
-	@echo "  test-unit    Run unit tests only"
-	@echo "  eval         Run promptfoo red-team evaluation"
+	@echo "  test              Run all tests with coverage (unit + integration)"
+	@echo "  test-unit         Run unit tests only"
+	@echo "  test-integration  Run integration tests (mocked LLM, no API keys needed)"
+	@echo "  eval              Run promptfoo skill evaluations"
 	@echo "  deploy-dev   Deploy to Agent Engine (dev)"
 	@echo "  deploy-prod  Deploy to Agent Engine (prod)"
 	@echo "  logs         Stream Cloud Logging output for this agent"
@@ -45,6 +46,9 @@ test:
 
 test-unit:
 	uv run pytest tests/unit -v
+
+test-integration:
+	uv run pytest tests/integration -v --tb=short
 
 eval:
 	uv run python tests/evals/run_eval.py
