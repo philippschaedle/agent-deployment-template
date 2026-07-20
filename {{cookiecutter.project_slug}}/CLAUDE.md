@@ -204,6 +204,7 @@ Run `cz bump` (via `uv run cz bump`) to cut a release and move unreleased entrie
 | `security.yml` | push to main + weekly | CodeQL, pip-audit CVEs, secret scan |
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
 | `deploy.yml` | push to main | deploys to Agent Engine prod |
+| `cruft-check.yml` | push + PR + weekly | non-blocking: warns if `cruft update` is available from the template |
 
 Required GitHub Secrets: `GCP_SA_KEY`, `GOOGLE_CLOUD_PROJECT`, `GCS_STAGING_BUCKET`, `GOOGLE_API_KEY`  # pragma: allowlist secret
 Required GitHub Variables: `GOOGLE_CLOUD_LOCATION`, `MODEL_PROVIDER`, `AGENT_ENGINE_RESOURCE_NAME` (after first deploy)

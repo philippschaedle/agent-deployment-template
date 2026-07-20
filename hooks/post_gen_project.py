@@ -8,10 +8,13 @@ PROJECT_DIR = Path(os.path.realpath(os.path.curdir))
 LICENSE_CHOICE = "{{ cookiecutter.open_source_license }}"
 PROJECT_SLUG = "{{ cookiecutter.project_slug }}"
 
-# Cookiecutter injects these private keys into the context at generation time.
-TEMPLATE_URL = "{{ cookiecutter._template }}"
-TEMPLATE_REPO_DIR = "{{ cookiecutter._repo_dir }}"
-TEMPLATE_CHECKOUT = "{{ cookiecutter._checkout }}"
+# Plain `cookiecutter` injects _template/_repo_dir/_checkout into the context.
+# `cruft create`/`cruft update` instead inject _template/_commit and omit the
+# rest, so every lookup here needs a Jinja default to avoid a hard failure.
+TEMPLATE_URL = "{{ cookiecutter._template | default('') }}"
+TEMPLATE_REPO_DIR = "{{ cookiecutter._repo_dir | default('') }}"
+TEMPLATE_CHECKOUT = "{{ cookiecutter._checkout | default('') }}"
+TEMPLATE_COMMIT_HINT = "{{ cookiecutter._commit | default('') }}"
 
 CRUFT_CONTEXT = {
     "project_name": "{{ cookiecutter.project_name }}",
@@ -47,6 +50,8 @@ def uv_available() -> bool:
 
 
 def get_template_commit() -> str:
+    if TEMPLATE_COMMIT_HINT:
+        return TEMPLATE_COMMIT_HINT
     if not TEMPLATE_REPO_DIR:
         return ""
     result = subprocess.run(
@@ -63,7 +68,9 @@ def write_cruft_json() -> None:
     cruft_config = {
         "template": TEMPLATE_URL,
         "commit": get_template_commit(),
-        "checkout": TEMPLATE_CHECKOUT if TEMPLATE_CHECKOUT != "None" else None,
+        "checkout": TEMPLATE_CHECKOUT
+        if TEMPLATE_CHECKOUT not in ("", "None")
+        else None,
         "context": {"cookiecutter": CRUFT_CONTEXT},
         "directory": None,
     }

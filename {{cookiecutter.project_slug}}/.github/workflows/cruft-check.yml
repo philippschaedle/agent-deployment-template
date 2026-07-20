@@ -1,0 +1,38 @@
+name: Cruft Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday 09:00 UTC
+
+jobs:
+  cruft-check:
+    name: Template drift check (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - name: Check for template updates
+        run: |
+          if [ ! -f .cruft.json ]; then
+            echo "No .cruft.json found — this project isn't tracked by cruft yet." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if uvx cruft check; then
+            echo "✅ In sync with [agent-deployment-template](https://github.com/{{cookiecutter.github_org}}/agent-deployment-template)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=Template update available::This project is behind agent-deployment-template. Run 'cruft update' locally to pull in the latest changes."
+            echo "⚠️ Behind [agent-deployment-template](https://github.com/{{cookiecutter.github_org}}/agent-deployment-template) — run \`cruft update\` locally to pull in the latest changes." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

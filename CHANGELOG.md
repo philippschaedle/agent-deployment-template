@@ -7,6 +7,14 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Fixed
+
+- `hooks/post_gen_project.py` no longer crashes under `cruft create`/`cruft update`: those
+  commands only inject `_template`/`_commit` into the cookiecutter context (not
+  `_repo_dir`/`_checkout`, which plain `cookiecutter` provides), and the strict Jinja lookup
+  raised `UndefinedError` and aborted generation. All private context lookups now use a
+  Jinja `default` so both flows work.
+
 ### Added
 
 - Template repo: `cruft` dev dependency for template maintainers to test `cruft create`/`cruft update`
@@ -14,6 +22,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   template commit used so `cruft check`/`cruft update` can track drift later
 - README: documented `cruft create` as the canonical project generation method, with a
   "keeping in sync" section covering `cruft check`/`cruft update`
+- Generated repo: `cruft-check.yml` workflow — non-blocking drift check that warns when the
+  project has fallen behind the template (`cruft check` on push/PR/weekly schedule)
 - Initial cookiecutter template with full ADK agent scaffold
 - `cookiecutter.json` with project metadata and model provider selection
 - `hooks/pre_gen_project.py` — input validation before generation
