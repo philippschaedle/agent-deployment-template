@@ -3,9 +3,16 @@
 All notable changes to this cookiecutter template are documented here.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
-Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — see
+[Template Versioning](CLAUDE.md#template-versioning) in `CLAUDE.md` for what bumps count as
+MAJOR/MINOR/PATCH and how releases are tagged.
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-07-20
+
+First cruft-aware release: generated projects can now track and pull in template updates
+via `cruft check`/`cruft update` instead of only being generated once and left to drift.
 
 ### Fixed
 
@@ -24,6 +31,17 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
   "keeping in sync" section covering `cruft check`/`cruft update`
 - Generated repo: `cruft-check.yml` workflow — non-blocking drift check that warns when the
   project has fallen behind the template (`cruft check` on push/PR/weekly schedule)
+- Template versioning discipline documented in `CLAUDE.md`, so releases are tagged and
+  generated projects have a controlled `cruft update --checkout <tag>` upgrade path
+
+## [1.0.0] - 2026-07-20
+
+Initial template baseline, tagged retroactively as the `1.0.0` reference point that
+`1.1.0` and later releases version against. No `v1.0.0` git tag exists — only `v1.1.0`
+onward are tagged (see [Template Versioning](CLAUDE.md#template-versioning)).
+
+### Added
+
 - Initial cookiecutter template with full ADK agent scaffold
 - `cookiecutter.json` with project metadata and model provider selection
 - `hooks/pre_gen_project.py` — input validation before generation

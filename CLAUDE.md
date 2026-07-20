@@ -65,6 +65,38 @@ The commit-msg hook will reject non-conforming commits.
 
 Update `CHANGELOG.md` under `[Unreleased]` for every user-facing change before committing. Use Keep a Changelog format.
 
+## Template Versioning
+
+This template is versioned independently from any generated project. Version bumps follow
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html):
+
+- **MAJOR** — a change that breaks existing generated projects on `cruft update` (renamed/removed
+  cookiecutter variable, restructured generated file layout, removed make target a workflow depends on)
+- **MINOR** — a backward-compatible addition (new cookiecutter variable with a sane default, new
+  workflow, new optional feature). Existing generated projects keep working untouched after `cruft update`.
+- **PATCH** — a fix or doc change with no effect on the generated project's structure or behavior
+
+### Cutting a release
+
+1. Make sure every change since the last release is recorded under `[Unreleased]` in `CHANGELOG.md`
+2. Rename `[Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` (leave a fresh empty `[Unreleased]` above it)
+3. Commit the CHANGELOG update
+4. Tag the release commit: `git tag -a vX.Y.Z -m "vX.Y.Z: <one-line summary>"`
+5. Push the tag with `git push --tags` (tags are how generated projects pin upgrades — see below)
+
+### How generated projects consume a release
+
+A generated project's `.cruft.json` pins the exact template commit it was created from.
+By default, `cruft update` pulls in whatever is on the template's `main` branch, which can
+include half-finished work. Instead, point it at a tagged release so upgrades are deliberate:
+
+```bash
+cruft update --checkout v1.1.0
+```
+
+Check that release's `CHANGELOG.md` entry first to know what the update will actually change
+before running it.
+
 ## Make targets
 
 | Target | Description |
