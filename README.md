@@ -23,13 +23,16 @@ Running `cookiecutter` against this template generates a fully configured Python
 - [uv](https://docs.astral.sh/uv/) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Node.js 20+ (for promptfoo)
 - [gcloud CLI](https://cloud.google.com/sdk/docs/install) (for deployment)
-- cookiecutter — `pip install cookiecutter`
+- [cruft](https://cruft.github.io/cruft/) — `pip install cruft` (wraps cookiecutter and tracks
+  the template version so you can pull in updates later; plain
+  `pip install cookiecutter` also works if you don't need update tracking)
 
 ## Quickstart
 
 ```bash
-# 1. Generate your agent project
-cookiecutter gh:your-org/agent-deployment-template
+# 1. Generate your agent project (cruft is the canonical way — it records
+#    which template commit you generated from, in .cruft.json)
+cruft create gh:your-org/agent-deployment-template
 
 # 2. Enter the generated project
 cd your-agent-name
@@ -40,6 +43,17 @@ cp .env.example .env
 
 # 4. Run locally
 make dev   # → http://localhost:8000
+```
+
+### Keeping a generated project in sync with the template
+
+Every generated project has a `.cruft.json` pinning the template commit it was
+created from. When the template gains new features or fixes, pull them into
+your project:
+
+```bash
+cruft check    # is this project behind the template?
+cruft update   # apply the diff — resolve conflicts like a merge
 ```
 
 ## Generation flow

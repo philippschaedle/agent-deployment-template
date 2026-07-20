@@ -26,6 +26,7 @@ typecheck:
 
 validate:
 	@echo "Generating test project from template..."
+	rm -rf /tmp/cc-validate
 	cookiecutter . --no-input \
 		--output-dir /tmp/cc-validate \
 		project_name="Test Agent" \
@@ -38,6 +39,7 @@ validate:
 	cd /tmp/cc-validate/test-agent && uv run pytest tests/integration -v --tb=short --no-cov
 	@echo ""
 	@echo "Template validation passed."
+	rm -rf /tmp/cc-validate
 
 pre-commit:
 	uv run pre-commit run --all-files
