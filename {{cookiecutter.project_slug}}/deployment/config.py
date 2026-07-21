@@ -1,4 +1,5 @@
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,6 +7,25 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+_SHA256_DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}$")
+
+
+def validate_image_digest(image_digest: str) -> str:
+    """Validate a container image digest ends in a well-formed sha256 digest.
+
+    Accepts either a bare digest (`sha256:<64 hex chars>`) or a full,
+    digest-pinned image reference (`registry/repo@sha256:<64 hex chars>`,
+    e.g. build.yml's `image_ref` output). Raises ValueError otherwise.
+    """
+    if not _SHA256_DIGEST_RE.search(image_digest):
+        raise ValueError(
+            f"Invalid image digest {image_digest!r}: expected 'sha256:<64 hex "
+            "chars>' or '<image>@sha256:<64 hex chars>' (see build.yml's "
+            "image_ref output)."
+        )
+    return image_digest
+
 
 def _project_name() -> str:
     """Read the project name from pyproject.toml so derived names stay in sync."""

@@ -22,6 +22,11 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 - Generated repo: `build.yml` workflow — builds and pushes the container image to Artifact
   Registry on push to `main` and on GitHub release creation, reusing the `GCP_SA_KEY` secret;
   outputs a digest-pinned image reference (`image_ref`) for later deploy jobs
+- Generated repo: `deployment/deploy.py` accepts an optional `--image-digest`/`IMAGE_DIGEST`
+  (validated as a well-formed `sha256:<64 hex>` digest) and records it as the deployed Agent
+  Engine resource's description for traceability. Deploys remain source-based — Agent Engine
+  pickles `root_agent` directly and does not run the container image; this is metadata only,
+  not a switch to image-based deployment
 
 ## [1.1.0] - 2026-07-20
 

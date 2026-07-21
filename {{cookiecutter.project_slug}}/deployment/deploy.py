@@ -19,19 +19,33 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def deploy(env: str) -> None:
+def deploy(env: str, image_digest: str | None = None) -> None:
+    """Deploy the agent to Vertex AI Agent Engine.
+
+    Deploys are source-based: Agent Engine pickles `root_agent` and its
+    dependencies directly, it does not run a container image. Pass
+    `image_digest` — the digest-pinned image ref from build.yml's `image_ref`
+    output (e.g. `registry/repo@sha256:...`) — to record which container
+    image was built for this commit as the resource's description, purely
+    for traceability. It is validated but never deployed.
+    """
     import vertexai
     from vertexai import agent_engines
 
     from agent.agent import root_agent
-    from deployment.config import DeploymentConfig
+    from deployment.config import DeploymentConfig, validate_image_digest
 
     config = DeploymentConfig.from_env()
+
+    if image_digest is not None:
+        image_digest = validate_image_digest(image_digest)
 
     logger.info("Deploying [%s] to Vertex AI Agent Engine", env)
     logger.info("  Project:  %s", config.project)
     logger.info("  Location: %s", config.location)
     logger.info("  Bucket:   %s", config.staging_bucket)
+    if image_digest:
+        logger.info("  Image:    %s", image_digest)
 
     vertexai.init(
         project=config.project,
@@ -53,24 +67,35 @@ def deploy(env: str) -> None:
     # alongside it (the prompts dir travels too for any runtime reads).
     extra_packages = ["agent", "prompts"]
 
+    # Purely informational — Agent Engine does not run this image, but recording
+    # it on the resource lets you trace a deploy back to the commit/image it
+    # came from without cross-referencing CI run history.
+    description = f"Built from image {image_digest}" if image_digest else None
+
     if config.resource_name:
         logger.info("  Updating: %s", config.resource_name)
         existing = agent_engines.get(config.resource_name)
-        remote_agent = existing.update(
+        update_kwargs = dict(
             agent_engine=root_agent,
             requirements=requirements,
             extra_packages=extra_packages,
             gcs_dir_name=config.gcs_dir_name,
-            )
+        )
+        if description:
+            update_kwargs["description"] = description
+        remote_agent = existing.update(**update_kwargs)
     else:
         logger.info("  Creating new Agent Engine resource...")
-        remote_agent = agent_engines.create(
+        create_kwargs = dict(
             agent_engine=root_agent,
             requirements=requirements,
             display_name=config.agent_display_name,
             gcs_dir_name=config.gcs_dir_name,
             extra_packages=extra_packages,
         )
+        if description:
+            create_kwargs["description"] = description
+        remote_agent = agent_engines.create(**create_kwargs)
 
     resource_name = remote_agent.resource_name
     logger.info("Deployed: %s", resource_name)
@@ -102,5 +127,14 @@ if __name__ == "__main__":
         default="prod",
         help="Target environment (default: prod)",
     )
+    parser.add_argument(
+        "--image-digest",
+        default=os.getenv("IMAGE_DIGEST"),
+        help=(
+            "Digest-pinned image ref from build.yml's image_ref output "
+            "(default: $IMAGE_DIGEST env var). Recorded as metadata only — "
+            "this deploy is source-based and does not run the image."
+        ),
+    )
     args = parser.parse_args()
-    deploy(args.env)
+    deploy(args.env, args.image_digest)

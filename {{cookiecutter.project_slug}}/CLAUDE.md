@@ -140,6 +140,7 @@ Set `MODEL_PROVIDER` in `.env`:
 | `GOOGLE_CLOUD_LOCATION` | Deploy only | `us-central1` | Vertex AI region |
 | `GCS_STAGING_BUCKET` | Deploy only | — | GCS bucket for Agent Engine artefacts |
 | `AGENT_ENGINE_RESOURCE_NAME` | No | — | Existing resource to update (omit = create new) |
+| `IMAGE_DIGEST` | No | — | Digest-pinned image ref (build.yml's `image_ref`); recorded as deploy metadata only, not deployed |
 | `MODEL_PROVIDER` | No | `google` | Provider selection |
 | `LITELLM_MODEL` | If provider=litellm | — | Full LiteLLM model string |
 | `ANTHROPIC_API_KEY` | If provider=anthropic | — | |

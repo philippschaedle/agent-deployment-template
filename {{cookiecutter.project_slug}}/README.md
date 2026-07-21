@@ -65,6 +65,15 @@ make deploy-dev           # deploy to dev Agent Engine resource
 make deploy-prod          # deploy to prod
 ```
 
+Deploys are source-based: Agent Engine pickles `root_agent` directly, it does not run the
+container image from `build.yml`. Pass that build's digest-pinned `image_ref` through
+`--image-digest`/`IMAGE_DIGEST` to record which image was built for this commit as the deployed
+resource's description — purely for traceability, not a change to what gets deployed:
+
+```bash
+IMAGE_DIGEST="$(cat image_ref.txt)" uv run python deployment/deploy.py --env prod
+```
+
 ### Container image build
 
 `make docker-build` builds the image locally. In CI, `.github/workflows/build.yml` builds and
