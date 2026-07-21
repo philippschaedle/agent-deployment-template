@@ -112,6 +112,7 @@ flowchart TD
 | `github_org` | `your-org` | GitHub organisation |
 | `gcp_project_id` | `my-gcp-project` | GCP project ID (update in `.env`) |
 | `gcp_location` | `europe-west1` | Vertex AI region |
+| `gcp_artifact_registry` | derived | Artifact Registry path for `make docker-build` pushes (`<location>-docker.pkg.dev/<project>/<slug>`) |
 | `model_provider` | `google` | Default model provider |
 | `python_version` | `3.11` | Python version |
 | `open_source_license` | `MIT` | License type (`MIT`, `Apache-2.0`, `Proprietary`) |

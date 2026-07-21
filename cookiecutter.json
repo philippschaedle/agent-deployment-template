@@ -7,6 +7,7 @@
   "github_org": "your-org",
   "gcp_project_id": "my-gcp-project",
   "gcp_location": ["europe-west1", "us-central1"],
+  "gcp_artifact_registry": "{{ cookiecutter.gcp_location }}-docker.pkg.dev/{{ cookiecutter.gcp_project_id }}/{{ cookiecutter.project_slug }}",
   "model_provider": ["google", "anthropic", "openai", "litellm"],
   "python_version": ["3.11", "3.12"],
   "open_source_license": ["MIT", "Apache-2.0", "Proprietary"]

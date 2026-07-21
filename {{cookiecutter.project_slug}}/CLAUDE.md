@@ -73,6 +73,7 @@ tests/
 | `make test` | Unit tests with coverage |
 | `make test-unit` | Unit tests only, verbose |
 | `make eval` | promptfoo red-team evaluation |
+| `make docker-build` | Build the container image (`{{cookiecutter.project_slug}}:latest`) |
 | `make lint` | ruff lint check |
 | `make format` | ruff format |
 | `make typecheck` | pyright |

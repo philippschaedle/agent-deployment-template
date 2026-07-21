@@ -25,6 +25,7 @@ CRUFT_CONTEXT = {
     "github_org": "{{ cookiecutter.github_org }}",
     "gcp_project_id": "{{ cookiecutter.gcp_project_id }}",
     "gcp_location": "{{ cookiecutter.gcp_location }}",
+    "gcp_artifact_registry": "{{ cookiecutter.gcp_artifact_registry }}",
     "model_provider": "{{ cookiecutter.model_provider }}",
     "python_version": "{{ cookiecutter.python_version }}",
     "open_source_license": "{{ cookiecutter.open_source_license }}",

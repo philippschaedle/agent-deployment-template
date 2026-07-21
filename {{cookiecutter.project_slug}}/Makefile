@@ -1,5 +1,5 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration eval \
-        deploy-dev deploy-prod logs traces setup-gcp pre-commit clean help
+        docker-build deploy-dev deploy-prod logs traces setup-gcp pre-commit clean help
 
 -include .env
 export
@@ -17,6 +17,7 @@ help:
 	@echo "  test-unit         Run unit tests only"
 	@echo "  test-integration  Run integration tests (mocked LLM, no API keys needed)"
 	@echo "  eval              Run promptfoo skill evaluations"
+	@echo "  docker-build Build the container image (tag: {{cookiecutter.project_slug}}:latest)"
 	@echo "  deploy-dev   Deploy to Agent Engine (dev)"
 	@echo "  deploy-prod  Deploy to Agent Engine (prod)"
 	@echo "  logs         Stream Cloud Logging output for this agent"
@@ -52,6 +53,9 @@ test-integration:
 
 eval:
 	uv run python tests/evals/run_eval.py
+
+docker-build:
+	docker build -t {{cookiecutter.project_slug}}:latest .
 
 deploy-dev:
 	uv run python deployment/deploy.py --env dev

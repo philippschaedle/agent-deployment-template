@@ -72,6 +72,7 @@ make deploy-prod          # deploy to prod
 | `make dev` | Run agent locally at http://localhost:8000 |
 | `make test` | Unit tests with coverage |
 | `make eval` | Prompt security evaluation (promptfoo) |
+| `make docker-build` | Build the container image (`{{cookiecutter.project_slug}}:latest`) |
 | `make lint` | Ruff lint check |
 | `make format` | Ruff formatter |
 | `make typecheck` | Pyright |

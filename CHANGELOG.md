@@ -9,6 +9,17 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ## [Unreleased]
 
+### Added
+
+- Generated repo: multi-stage `Dockerfile` (uv-based, non-root runtime user), `.dockerignore`
+- Generated repo: `agent/__main__.py` — `python -m agent` serves the agent via `adk api_server`,
+  binding to `$PORT` (Cloud Run convention) so the same image works locally and on Cloud Run later
+- Generated repo: `make docker-build` target
+- `gcp_artifact_registry` cookiecutter variable (Artifact Registry path for future image pushes)
+- Template repo: `make validate` and `validate-template.yml` now build the generated project's
+  image and smoke-test `python -m agent --help` inside it (build validation is skipped locally
+  with a warning if Docker isn't available, but always runs in CI)
+
 ## [1.1.0] - 2026-07-20
 
 First cruft-aware release: generated projects can now track and pull in template updates

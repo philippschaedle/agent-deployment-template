@@ -37,6 +37,17 @@ validate:
 	cd /tmp/cc-validate/test-agent && uv run ruff check .
 	cd /tmp/cc-validate/test-agent && uv run pytest tests/unit -v --no-cov
 	cd /tmp/cc-validate/test-agent && uv run pytest tests/integration -v --tb=short --no-cov
+	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		echo ""; \
+		echo "Building container image..."; \
+		docker build -t cc-validate-test-agent:latest /tmp/cc-validate/test-agent; \
+		echo "Smoke-testing container entrypoint..."; \
+		docker run --rm cc-validate-test-agent:latest python -m agent --help; \
+		docker rmi cc-validate-test-agent:latest >/dev/null; \
+	else \
+		echo ""; \
+		echo "WARNING: Docker not available — skipping container build validation."; \
+	fi
 	@echo ""
 	@echo "Template validation passed."
 	rm -rf /tmp/cc-validate

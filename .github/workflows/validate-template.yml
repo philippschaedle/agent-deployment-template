@@ -55,3 +55,10 @@ jobs:
         working-directory: /tmp/cc-test/test-agent
         env:
           PYTHONPATH: /tmp/cc-test/test-agent
+
+      - name: Build container image
+        run: docker build -t test-agent:latest .
+        working-directory: /tmp/cc-test/test-agent
+
+      - name: Smoke-test container entrypoint
+        run: docker run --rm test-agent:latest python -m agent --help
