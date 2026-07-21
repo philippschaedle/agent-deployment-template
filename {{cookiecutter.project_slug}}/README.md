@@ -65,6 +65,15 @@ make deploy-dev           # deploy to dev Agent Engine resource
 make deploy-prod          # deploy to prod
 ```
 
+### Container image build
+
+`make docker-build` builds the image locally. In CI, `.github/workflows/build.yml` builds and
+pushes it to Artifact Registry on every push to `main` and on GitHub release creation, using the
+same `GCP_SA_KEY` secret as `deploy.yml`. It tags the image `latest` and the triggering commit
+SHA, and outputs a digest-pinned reference (`{{cookiecutter.gcp_artifact_registry}}@sha256:...`)
+as the job output `image_ref` — visible in the workflow's step summary — for deploy jobs to
+consume once they move to image-based deployment.
+
 ## Make targets
 
 | Target | Description |

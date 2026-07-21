@@ -204,6 +204,7 @@ Run `cz bump` (via `uv run cz bump`) to cut a release and move unreleased entrie
 | `ci.yml` | push + PR | lint, format, typecheck, unit tests |
 | `security.yml` | push to main + weekly | CodeQL, pip-audit CVEs, secret scan |
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
+| `build.yml` | push to main + GitHub release | builds the container image, pushes it to Artifact Registry, outputs a digest-pinned image reference (`image_ref`) for deploy jobs to consume |
 | `deploy.yml` | push to main | deploys to Agent Engine prod |
 | `cruft-check.yml` | push + PR + weekly | non-blocking: warns if `cruft update` is available from the template |
 

@@ -1,0 +1,62 @@
+name: Build
+
+# Image tags below are rendered from the `gcp_artifact_registry` cookiecutter
+# variable (see cookiecutter.json) — edit that variable, not this file, to
+# repoint the build at a different Artifact Registry path.
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  build-and-push:
+    name: Build and push container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_digest: {% raw %}${{ steps.build.outputs.digest }}{% endraw %}
+      image_ref: {% raw %}${{ steps.image-ref.outputs.ref }}{% endraw %}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: {% raw %}${{ secrets.GCP_SA_KEY }}{% endraw %}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: {{ cookiecutter.gcp_artifact_registry.split('/')[0] }}
+          username: oauth2accesstoken
+          password: {% raw %}${{ steps.auth.outputs.access_token }}{% endraw %}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            {{cookiecutter.gcp_artifact_registry}}:latest
+            {{cookiecutter.gcp_artifact_registry}}:{% raw %}${{ github.sha }}{% endraw %}
+
+      - name: Record digest-pinned image reference
+        id: image-ref
+        run: |
+          echo "ref={{cookiecutter.gcp_artifact_registry}}@{% raw %}${{ steps.build.outputs.digest }}{% endraw %}" >> "$GITHUB_OUTPUT"
+
+      - name: Write build summary
+        run: |
+          echo "## Image built and pushed" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Digest:** \`{% raw %}${{ steps.build.outputs.digest }}{% endraw %}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Pinned reference:** \`{% raw %}${{ steps.image-ref.outputs.ref }}{% endraw %}\`" >> "$GITHUB_STEP_SUMMARY"

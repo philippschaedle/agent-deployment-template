@@ -19,6 +19,9 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 - Template repo: `make validate` and `validate-template.yml` now build the generated project's
   image and smoke-test `python -m agent --help` inside it (build validation is skipped locally
   with a warning if Docker isn't available, but always runs in CI)
+- Generated repo: `build.yml` workflow — builds and pushes the container image to Artifact
+  Registry on push to `main` and on GitHub release creation, reusing the `GCP_SA_KEY` secret;
+  outputs a digest-pinned image reference (`image_ref`) for later deploy jobs
 
 ## [1.1.0] - 2026-07-20
 
