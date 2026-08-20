@@ -1,7 +1,7 @@
 # Implementation Checkpoint Tracker
 
-**Last Updated:** 2026-08-20  
-**Next Phase:** Phase 4 (Observability) — Checkpoint 4B
+**Last Updated:** 2026-08-20
+**Next Phase:** Phase 4 (Observability) — Checkpoint 4C
 
 This file tracks the completion status of the implementation checkpoints.
 
@@ -13,8 +13,8 @@ This file tracks the completion status of the implementation checkpoints.
 |-------|--------|-------------|-----------|
 | Phase 2 | ✅ Complete | 3 (2A, 2B, 2C) | 3/3 |
 | Phase 3 | ✅ Complete | 3 (3A, 3B, 3C) | 3/3 |
-| Phase 4 | 🔄 In Progress | 3 (4A, 4B, 4C) | 1/3 |
-| **Total** | | **9** | **7/9** |
+| Phase 4 | 🔄 In Progress | 3 (4A, 4B, 4C) | 2/3 |
+| **Total** | | **9** | **8/9** |
 
 > **2026-08-20 — Phase 3 (Containerization) removed.** The original Phase 3 (Dockerfile,
 > build workflow, image-digest deploy config) was implemented as checkpoints 3A-3C, then fully
@@ -28,8 +28,8 @@ This file tracks the completion status of the implementation checkpoints.
 
 ## Phase 2: Template Sync (Cruft)
 
-**Duration:** Weeks 3-4  
-**Objectives:** Cruft integration, drift detection, versioning discipline  
+**Duration:** Weeks 3-4
+**Objectives:** Cruft integration, drift detection, versioning discipline
 **Status:** ✅ COMPLETE
 
 ### Checkpoint 2A: Cruft Integration & .cruft.json
@@ -58,8 +58,8 @@ This file tracks the completion status of the implementation checkpoints.
 
 ## Phase 3: CI/CD Deployment Hardening (Vertex AI Agent Engine)
 
-**Duration:** Weeks 5-6  
-**Objectives:** Rollback procedure, standalone health check, dev/prod docs & secrets audit  
+**Duration:** Weeks 5-6
+**Objectives:** Rollback procedure, standalone health check, dev/prod docs & secrets audit
 **Status:** 📋 PLANNED
 
 > Re-scoped 2026-08-20 from a Cloud Run-oriented plan (this was originally "Phase 4"). Most of
@@ -94,8 +94,8 @@ This file tracks the completion status of the implementation checkpoints.
 
 ## Phase 4: Observability
 
-**Duration:** Weeks 7-8  
-**Objectives:** Instrumentation, structured logging, monitoring, alerting, cost tracking  
+**Duration:** Weeks 7-8
+**Objectives:** Instrumentation, structured logging, monitoring, alerting, cost tracking
 **Status:** 🔄 IN PROGRESS
 
 ### Checkpoint 4A: Core Instrumentation Library
@@ -113,11 +113,19 @@ This file tracks the completion status of the implementation checkpoints.
   promptfoo eval provider).
 
 ### Checkpoint 4B: Cloud Logging Integration & Structured Output
-- [ ] **Status:** Not started
+- [x] **Status:** Completed (2026-08-20)
 - **Scope:** JSON log format, Cloud Logging sink config, query examples, integration tests
-- **Files:** deploy.yml, agent/observability.py, tests/integration/, README.md
-- **Validation:** `make validate` + verify JSON log format
+- **Files:** {{cookiecutter.project_slug}}/agent/observability.py, tests/integration/, tests/unit/test_observability.py, README.md, CLAUDE.md, deployment/scripts/read_logs.sh
+- **Validation:** `make validate` + `python -c "from agent.observability import log_event; log_event('test', {'key': 'value'})" | python -m json.tool`
 - **Commit:** `feat(logging): integrate Cloud Logging with structured JSON output`
+- **Notes:** No literal "Cloud Logging sink" resource exists to configure in `deploy.yml` — Agent
+  Engine forwards container stdout/stderr to Cloud Logging automatically, same as Cloud Run, so
+  there's no separate sink to wire up. The genuine gap was that `log_event`'s JSON didn't carry
+  the `severity`/`agent_name` fields `deployment/scripts/read_logs.sh` already expected (it was
+  written assuming those fields would exist) — added both, with `severity=ERROR` promoted out of
+  `jsonPayload` into the LogEntry itself per Cloud Logging's structured-logging convention. Added
+  2 integration tests validating the JSON shape through the full mocked Runner pipeline, plus
+  Cloud Logging query examples in README.md and a log-field reference table in CLAUDE.md.
 
 ### Checkpoint 4C: Monitoring Dashboard & Alerting Rules
 - [ ] **Status:** Not started

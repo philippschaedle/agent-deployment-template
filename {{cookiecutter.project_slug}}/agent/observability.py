@@ -5,8 +5,11 @@ controls. Agent Engine's managed runtime drives the ADK `Runner` internally, so 
 decorator on `Runner.run_async` would never fire in production; tool calls are invoked
 by our own code regardless of where the agent runs, so that's the choke point used here.
 
-Cloud Logging parses a JSON-formatted stdout line into `jsonPayload` automatically --
-no separate log-shipping configuration is needed.
+Cloud Logging parses a JSON-formatted stdout line into `jsonPayload` automatically, and
+promotes reserved top-level keys -- `severity` here -- out of `jsonPayload` into the
+LogEntry's own fields, making them filterable in Logs Explorer (e.g. `severity=ERROR`).
+No separate log sink is needed: Agent Engine forwards container stdout/stderr to Cloud
+Logging on its own, the same way Cloud Run does.
 """
 
 from __future__ import annotations
@@ -58,14 +61,24 @@ def redact_pii(value: Any) -> Any:
     return value
 
 
-def log_event(event_type: str, fields: dict[str, Any] | None = None) -> None:
-    """Emit one structured JSON log line: `{"event": event_type, ...fields}`.
+def log_event(
+    event_type: str, fields: dict[str, Any] | None = None, severity: str = "INFO"
+) -> None:
+    """Emit one structured JSON log line for Cloud Logging.
 
-    All field values are passed through `redact_pii` first.
+    `severity` is a Cloud Logging reserved field (`INFO`, `ERROR`, ...), promoted out
+    of `jsonPayload` into the LogEntry itself. `agent_name` matches the filter already
+    used by `deployment/scripts/read_logs.sh`. All other field values are passed
+    through `redact_pii` first.
     """
-    payload: dict[str, Any] = {"event": event_type}
+    payload: dict[str, Any] = {
+        "severity": severity,
+        "agent_name": "root_agent",
+        "event": event_type,
+    }
     payload.update(redact_pii(fields or {}))
-    logger.info(json.dumps(payload, default=str))
+    log = logger.error if severity == "ERROR" else logger.info
+    log(json.dumps(payload, default=str))
 
 
 def log_model_usage(event: Any) -> None:
@@ -115,6 +128,7 @@ def instrument(func: F) -> F:
         log_event(
             f"{func.__name__}.error",
             {"duration_ms": round(duration_ms, 2), "error": str(exc)},
+            severity="ERROR",
         )
 
     if inspect.iscoroutinefunction(func):

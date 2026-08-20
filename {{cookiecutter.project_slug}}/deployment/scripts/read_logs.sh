@@ -26,7 +26,7 @@ for e in entries:
     severity = e.get('severity', 'INFO')[:4]
     payload = e.get('jsonPayload') or e.get('textPayload') or e.get('protoPayload') or {}
     if isinstance(payload, dict):
-        msg = payload.get('message') or payload.get('msg') or json.dumps(payload)
+        msg = payload.get('message') or payload.get('msg') or payload.get('event') or json.dumps(payload)
     else:
         msg = str(payload)
     color = '\033[31m' if severity in ('ERRO','CRIT') else '\033[33m' if severity == 'WARN' else '\033[0m'

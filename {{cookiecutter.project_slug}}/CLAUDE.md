@@ -121,8 +121,12 @@ runtime drives internally and which our code never touches in production:
 - **`@instrument`** — wraps a tool function (sync or async) and logs `<name>.start`,
   `<name>.end` (with `duration_ms`), or `<name>.error` (with the exception message) as JSON.
   Already applied to both tools in `agent/tools/example_tools.py`.
-- **`log_event(event_type, fields)`** — emit one structured JSON line for anything else worth
-  recording. Cloud Logging parses a JSON stdout line into `jsonPayload` automatically.
+- **`log_event(event_type, fields, severity="INFO")`** — emit one structured JSON line for
+  anything else worth recording. Cloud Logging parses a JSON stdout line into `jsonPayload`
+  automatically, and promotes reserved top-level keys — `severity` here — out of `jsonPayload`
+  into the LogEntry itself, so `severity=ERROR` is filterable directly in Logs Explorer. No
+  separate Cloud Logging sink is needed: Agent Engine forwards container stdout/stderr on its own,
+  the same way Cloud Run does.
 - **`redact_pii(value)`** — recursively redacts emails, SSNs, and credit-card-shaped numbers from
   strings, dicts, and lists. `log_event` and `@instrument` both redact fields before logging them,
   but it's a defence-in-depth measure, not a substitute for not logging sensitive fields in the
@@ -130,6 +134,24 @@ runtime drives internally and which our code never touches in production:
 - **`log_model_usage(event)`** — logs token counts from an ADK event's `usage_metadata`, for code
   that iterates the event stream itself (the promptfoo eval provider does); not reachable from
   Agent Engine's own request path for the same reason `@instrument` doesn't wrap `Runner.run_async`.
+
+### Log fields
+
+Every event is one JSON object with these keys (exact set depends on which function emitted it):
+
+| Field | Emitted by | Description |
+|---|---|---|
+| `severity` | all | `INFO` or `ERROR`; a Cloud Logging reserved field, filterable as `severity=ERROR` |
+| `agent_name` | all | Always `root_agent` — matches the filter `deployment/scripts/read_logs.sh` uses |
+| `event` | all | Event name: `<tool>.start` / `.end` / `.error`, or `model.usage` |
+| `duration_ms` | `@instrument` | Wall-clock time for the call |
+| `outcome` | `@instrument` (`.end`) | Always `success` — failures are a separate `.error` event instead |
+| `error` | `@instrument` (`.error`) | `str(exception)` |
+| `args`, `kwargs` | `@instrument` (`.start`) | The call's arguments, PII-redacted |
+| `prompt_tokens`, `candidates_tokens`, `total_tokens` | `log_model_usage` | From the ADK event's `usage_metadata` |
+
+See [Cloud Logging query examples](README.md#cloud-logging-query-examples) in `README.md` for
+filters using these fields.
 
 ## How to modify prompts
 

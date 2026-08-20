@@ -3,6 +3,7 @@
 Patches Runner.run_async to return pre-written events so agent pipeline tests
 never make real LLM API calls.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -20,6 +21,9 @@ def _make_text_event(text: str) -> MagicMock:
     event = MagicMock()
     event.is_final_response.return_value = True
     event.content = content
+    # Explicit None (not the MagicMock a bare attribute access would auto-create) so
+    # log_model_usage's `is None` check behaves like a real event without usage data.
+    event.usage_metadata = None
     return event
 
 
@@ -28,6 +32,21 @@ def _make_intermediate_event() -> MagicMock:
     event = MagicMock()
     event.is_final_response.return_value = False
     event.content = None
+    event.usage_metadata = None
+    return event
+
+
+def _make_text_event_with_usage(
+    text: str, prompt_tokens: int, candidates_tokens: int
+) -> MagicMock:
+    """Return a final-response event that also carries usage_metadata, like a real
+    Gemini response does."""
+    event = _make_text_event(text)
+    usage = MagicMock()
+    usage.prompt_token_count = prompt_tokens
+    usage.candidates_token_count = candidates_tokens
+    usage.total_token_count = prompt_tokens + candidates_tokens
+    event.usage_metadata = usage
     return event
 
 
@@ -41,6 +60,12 @@ def make_text_event():
 def make_intermediate_event():
     """Factory: build a non-final in-progress event."""
     return _make_intermediate_event
+
+
+@pytest.fixture
+def make_text_event_with_usage():
+    """Factory: build a final-response event that also carries usage_metadata."""
+    return _make_text_event_with_usage
 
 
 @pytest.fixture

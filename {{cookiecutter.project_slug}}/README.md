@@ -121,7 +121,29 @@ make logs     # stream Cloud Logging (requires GOOGLE_CLOUD_PROJECT in .env)
 make traces   # open Cloud Trace console in browser
 ```
 
-Agent Engine emits traces and structured logs automatically — no instrumentation needed.
+Agent Engine forwards container stdout/stderr to Cloud Logging and emits request traces
+automatically — no log sink to configure. On top of that, `agent/observability.py` emits its own
+structured JSON events (tool calls, token usage) via `log_event`/`@instrument`; see
+[Observability](CLAUDE.md#observability) in `CLAUDE.md` for the field reference.
+
+### Cloud Logging query examples
+
+Run these in [Logs Explorer](https://console.cloud.google.com/logs) or via `gcloud logging read`
+(the same filter `make logs` / `read_logs.sh` uses):
+
+```bash
+# Every structured event this agent emits
+gcloud logging read 'jsonPayload.agent_name="root_agent"' --project=$GOOGLE_CLOUD_PROJECT --limit=50
+
+# Only failures (tool errors)
+gcloud logging read 'jsonPayload.agent_name="root_agent" AND severity=ERROR' --project=$GOOGLE_CLOUD_PROJECT
+
+# A specific tool's calls (start/end/error events all share its name as a prefix)
+gcloud logging read 'jsonPayload.event=~"^web_search\."' --project=$GOOGLE_CLOUD_PROJECT
+
+# Token usage per request
+gcloud logging read 'jsonPayload.event="model.usage"' --project=$GOOGLE_CLOUD_PROJECT
+```
 
 ## Security
 

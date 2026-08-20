@@ -37,7 +37,24 @@ def test_log_event_emits_json_with_event_type(monkeypatch):
 
     log_event("test", {"key": "value"})
 
-    assert json.loads(messages[0]) == {"event": "test", "key": "value"}
+    assert json.loads(messages[0]) == {
+        "severity": "INFO",
+        "agent_name": "root_agent",
+        "event": "test",
+        "key": "value",
+    }
+
+
+def test_log_event_uses_error_severity_and_logger_error(monkeypatch):
+    info_messages = []
+    error_messages = []
+    monkeypatch.setattr("agent.observability.logger.info", info_messages.append)
+    monkeypatch.setattr("agent.observability.logger.error", error_messages.append)
+
+    log_event("test", {"key": "value"}, severity="ERROR")
+
+    assert info_messages == []
+    assert json.loads(error_messages[0])["severity"] == "ERROR"
 
 
 def test_log_event_redacts_pii_in_fields(monkeypatch):
@@ -72,6 +89,9 @@ def test_instrument_sync_function_logs_error_and_reraises(monkeypatch):
     monkeypatch.setattr(
         "agent.observability.logger.info", lambda m: messages.append(json.loads(m))
     )
+    monkeypatch.setattr(
+        "agent.observability.logger.error", lambda m: messages.append(json.loads(m))
+    )
 
     @instrument
     def boom():
@@ -82,6 +102,7 @@ def test_instrument_sync_function_logs_error_and_reraises(monkeypatch):
 
     assert [m["event"] for m in messages] == ["boom.start", "boom.error"]
     assert messages[1]["error"] == "nope"
+    assert messages[1]["severity"] == "ERROR"
 
 
 async def test_instrument_async_function_returns_value_and_logs(monkeypatch):
@@ -128,6 +149,8 @@ def test_log_model_usage_logs_token_counts(monkeypatch):
 
     assert messages == [
         {
+            "severity": "INFO",
+            "agent_name": "root_agent",
             "event": "model.usage",
             "prompt_tokens": 10,
             "candidates_tokens": 5,

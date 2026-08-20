@@ -29,6 +29,12 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   (applied to both example tools), PII redaction (email/SSN/credit-card patterns), and
   `log_model_usage()` for token-count logging where the event stream is iterated directly
   (the promptfoo eval provider). Documented in the generated project's `CLAUDE.md`.
+- Cloud Logging integration: `log_event` now emits `severity` and `agent_name` fields —
+  `severity` is a Cloud Logging reserved field (promoted out of `jsonPayload` into the LogEntry,
+  filterable as `severity=ERROR`), and `agent_name` matches the filter `read_logs.sh` already
+  used. Added Cloud Logging query examples to the generated `README.md`, a log-field reference
+  table to `CLAUDE.md`, and 2 integration tests validating the JSON shape through the full
+  mocked Runner pipeline.
 
 ## [1.1.0] - 2026-07-20
 
