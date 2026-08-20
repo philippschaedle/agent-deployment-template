@@ -55,6 +55,15 @@ jobs:
           AGENT_ENGINE_RESOURCE_NAME: {% raw %}${{ vars.AGENT_ENGINE_RESOURCE_NAME }}{% endraw %}
           MODEL_PROVIDER: {% raw %}${{ vars.MODEL_PROVIDER || 'google' }}{% endraw %}
 
+      - name: Health check
+        run: |
+          export AGENT_ENGINE_RESOURCE_NAME="$(cat .agent_engine_resource)"
+          uv run python deployment/scripts/health_check.py
+        env:
+          GOOGLE_CLOUD_PROJECT: {% raw %}${{ secrets.GOOGLE_CLOUD_PROJECT }}{% endraw %}
+          GOOGLE_CLOUD_LOCATION: {% raw %}${{ vars.GOOGLE_CLOUD_LOCATION }}{% endraw %}
+          GCS_STAGING_BUCKET: {% raw %}${{ secrets.GCS_STAGING_BUCKET }}{% endraw %}
+
       - name: Write deployment summary
         if: success()
         run: |

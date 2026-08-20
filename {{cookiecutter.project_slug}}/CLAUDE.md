@@ -80,6 +80,7 @@ tests/
 | `make deploy-dev` | Deploy to Agent Engine (dev) |
 | `make deploy-prod` | Deploy to Agent Engine (prod) |
 | `make rollback REF=<tag> [ENV=prod\|dev]` | Redeploy a previous git ref against the existing Agent Engine resource |
+| `make health-check` | Standalone smoke test against the deployed Agent Engine resource (no fresh deploy) |
 | `make logs` | Stream Cloud Logging |
 | `make traces` | Open Cloud Trace in browser |
 | `make setup-gcp` | One-time GCP bootstrap |
@@ -218,6 +219,25 @@ afterwards regardless of whether the deploy succeeds.
 workflow) and set the `ref` input to the tag, branch, or SHA you want to roll back to, alongside
 the `environment` input. Leaving `ref` empty deploys the triggering ref as usual.
 
+After either path, run `make health-check` to confirm the resource is responding — useful when
+you want to verify a rollback worked without triggering another deploy.
+
+## Health check
+
+`deployment/scripts/health_check.py` sends a message to the Agent Engine resource named by
+`AGENT_ENGINE_RESOURCE_NAME` and requires at least one event back — the same smoke test
+`deploy.py` runs right after deploying, but runnable standalone against an already-deployed
+resource:
+
+```bash
+make health-check                                                    # uses .env
+uv run python deployment/scripts/health_check.py --message "hello"   # customize the ping
+```
+
+Exits `0` on success, `1` on failure, so it's safe to gate CI or a cron job on. `deploy.yml` runs
+it as its own step right after deploying, reading the resource name from `.agent_engine_resource`
+so it works whether that deploy created a new resource or updated an existing one.
+
 ## CI/CD overview
 
 | Workflow | Trigger | What it checks |
@@ -225,7 +245,7 @@ the `environment` input. Leaving `ref` empty deploys the triggering ref as usual
 | `ci.yml` | push + PR | lint, format, typecheck, unit tests |
 | `security.yml` | push to main + weekly | CodeQL, pip-audit CVEs, secret scan |
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
-| `deploy.yml` | push to main | deploys to Agent Engine prod |
+| `deploy.yml` | push to main | deploys to Agent Engine prod, then runs a standalone health check |
 | `cruft-check.yml` | push + PR + weekly | non-blocking: warns if `cruft update` is available from the template |
 
 Required GitHub Secrets: `GCP_SA_KEY`, `GOOGLE_CLOUD_PROJECT`, `GCS_STAGING_BUCKET`, `GOOGLE_API_KEY`  # pragma: allowlist secret

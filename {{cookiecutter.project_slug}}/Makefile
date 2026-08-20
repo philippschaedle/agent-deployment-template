@@ -1,5 +1,5 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration eval \
-        deploy-dev deploy-prod rollback logs traces setup-gcp pre-commit clean help
+        deploy-dev deploy-prod rollback health-check logs traces setup-gcp pre-commit clean help
 
 -include .env
 export
@@ -20,6 +20,7 @@ help:
 	@echo "  deploy-dev   Deploy to Agent Engine (dev)"
 	@echo "  deploy-prod  Deploy to Agent Engine (prod)"
 	@echo "  rollback     Redeploy a previous git ref: make rollback REF=<tag> [ENV=prod|dev]"
+	@echo "  health-check Run a standalone smoke test against the deployed Agent Engine resource"
 	@echo "  logs         Stream Cloud Logging output for this agent"
 	@echo "  traces       Open Cloud Trace in browser"
 	@echo "  setup-gcp    One-time GCP project bootstrap"
@@ -73,6 +74,9 @@ rollback:
 	status=$$?; \
 	git checkout "$$branch"; \
 	exit $$status
+
+health-check:
+	uv run python deployment/scripts/health_check.py
 
 logs:
 	bash deployment/scripts/read_logs.sh

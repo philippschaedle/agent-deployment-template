@@ -15,6 +15,10 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   `workflow_dispatch` input (defaults to the triggering ref), and generated projects get a
   `make rollback REF=<tag> [ENV=prod|dev]` target that redeploys a previous git ref against the
   existing Agent Engine resource. Documented in the generated project's `CLAUDE.md`.
+- Standalone post-deployment health check: the smoke test previously inlined in `deploy.py` is
+  now `deployment/scripts/health_check.py`, runnable against an existing Agent Engine resource
+  without a fresh deploy. Exposed as `make health-check` and wired into `deploy.yml` as its own
+  step after deploy (clear 0/1 exit codes for CI gating).
 
 ## [1.1.0] - 2026-07-20
 

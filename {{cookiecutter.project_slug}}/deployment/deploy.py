@@ -77,18 +77,11 @@ def deploy(env: str) -> None:
 
     Path(".agent_engine_resource").write_text(resource_name + "\n")
 
+    from deployment.scripts.health_check import run_smoke_test
+
     logger.info("Running smoke test...")
-        # A deployed ADK agent exposes stream_query (a generator of event dicts),
-    # not query. Drain it and require at least one event back.
-    events = list(
-        remote_agent.stream_query(  # type: ignore[attr-defined]
-            message="ping", user_id="smoke-test"
-        )
-    )
-    if not events:
-        logger.error("Smoke test returned no events.")
+    if not run_smoke_test(remote_agent):
         sys.exit(1)
-    logger.info("Smoke test passed.")
 
     # Emit for CI capture
     logger.info("AGENT_ENGINE_RESOURCE_NAME=%s", resource_name)
