@@ -1,0 +1,146 @@
+{
+  "displayName": "{{cookiecutter.project_name}} — Agent Engine",
+  "gridLayout": {
+    "columns": "2",
+    "widgets": [
+      {
+        "title": "Request count by response code",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_count\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE",
+                    "crossSeriesReducer": "REDUCE_SUM",
+                    "groupByFields": ["metric.label.response_code_class"]
+                  }
+                }
+              },
+              "plotType": "STACKED_BAR"
+            }
+          ],
+          "yAxis": {
+            "label": "requests/s",
+            "scale": "LINEAR"
+          },
+          "chartOptions": {
+            "mode": "COLOR"
+          }
+        }
+      },
+      {
+        "title": "Request latency (p50 / p95 / p99)",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_latencies\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_50",
+                    "crossSeriesReducer": "REDUCE_PERCENTILE_50"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p50"
+            },
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_latencies\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_95",
+                    "crossSeriesReducer": "REDUCE_PERCENTILE_95"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p95"
+            },
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_latencies\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_PERCENTILE_99",
+                    "crossSeriesReducer": "REDUCE_PERCENTILE_99"
+                  }
+                }
+              },
+              "plotType": "LINE",
+              "legendTemplate": "p99"
+            }
+          ],
+          "yAxis": {
+            "label": "ms",
+            "scale": "LINEAR"
+          },
+          "chartOptions": {
+            "mode": "COLOR"
+          }
+        }
+      },
+      {
+        "title": "Container CPU allocation time",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/cpu/allocation_time\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE",
+                    "crossSeriesReducer": "REDUCE_SUM"
+                  }
+                }
+              },
+              "plotType": "LINE"
+            }
+          ],
+          "yAxis": {
+            "label": "ms/s",
+            "scale": "LINEAR"
+          },
+          "chartOptions": {
+            "mode": "COLOR"
+          }
+        }
+      },
+      {
+        "title": "Container memory allocation time",
+        "xyChart": {
+          "dataSets": [
+            {
+              "timeSeriesQuery": {
+                "timeSeriesFilter": {
+                  "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/memory/allocation_time\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+                  "aggregation": {
+                    "alignmentPeriod": "60s",
+                    "perSeriesAligner": "ALIGN_RATE",
+                    "crossSeriesReducer": "REDUCE_SUM"
+                  }
+                }
+              },
+              "plotType": "LINE"
+            }
+          ],
+          "yAxis": {
+            "label": "ms/s",
+            "scale": "LINEAR"
+          },
+          "chartOptions": {
+            "mode": "COLOR"
+          }
+        }
+      }
+    ]
+  }
+}

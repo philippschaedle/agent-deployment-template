@@ -1,0 +1,37 @@
+{
+  "displayName": "{{cookiecutter.project_name}} — high error rate",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "5xx response rate above 5% for 5 minutes",
+      "conditionThreshold": {
+        "filter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_count\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\" metric.labels.response_code_class=\"5xx\"",
+        "denominatorFilter": "metric.type=\"aiplatform.googleapis.com/reasoning_engine/request_count\" resource.type=\"aiplatform.googleapis.com/ReasoningEngine\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0.05,
+        "duration": "300s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "denominatorAggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_RATE",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "notificationChannels": [],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  }
+}

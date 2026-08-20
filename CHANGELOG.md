@@ -35,6 +35,13 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   used. Added Cloud Logging query examples to the generated `README.md`, a log-field reference
   table to `CLAUDE.md`, and 2 integration tests validating the JSON shape through the full
   mocked Runner pipeline.
+- Cloud Monitoring dashboard and alert policies: `deployment/monitoring/` adds a dashboard
+  (request count by response code, p50/p95/p99 latency, CPU/memory allocation) and two alert
+  policies (5xx rate > 5%, p95 latency > 3000ms) against Agent Engine's built-in
+  `reasoning_engine/*` metrics, applied via plain `gcloud` — this template uses no Terraform, so
+  `setup_monitoring.sh` (new `make setup-monitoring` target) creates/updates them idempotently,
+  with optional email/Slack notification channels. Rate-limit/quota alerting isn't included: no
+  per-agent quota metric exists to threshold on; that's documented as a manual Cloud Console step.
 
 ## [1.1.0] - 2026-07-20
 

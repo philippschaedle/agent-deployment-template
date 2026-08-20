@@ -87,6 +87,7 @@ exactly what to configure and where `setup-gcp`'s output goes.
 | `make logs` | Stream Cloud Logging |
 | `make traces` | Open Cloud Trace in browser |
 | `make setup-gcp [ENV=dev\|prod]` | One-time GCP bootstrap (default: prod) |
+| `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
 | `make pre-commit` | Run all pre-commit hooks |
 
 ## Environment variables
@@ -144,6 +145,16 @@ gcloud logging read 'jsonPayload.event=~"^web_search\."' --project=$GOOGLE_CLOUD
 # Token usage per request
 gcloud logging read 'jsonPayload.event="model.usage"' --project=$GOOGLE_CLOUD_PROJECT
 ```
+
+## Monitoring and alerting
+
+```bash
+make setup-monitoring   # one-time: dashboard + error-rate/latency alert policies
+```
+
+Builds on Agent Engine's built-in `reasoning_engine/*` metrics (request count, latency, CPU/memory
+allocation) — see [Monitoring & alerting](CLAUDE.md#monitoring--alerting) in `CLAUDE.md` for the
+metric reference, alert thresholds, and how to attach an email or Slack notification channel.
 
 ## Security
 

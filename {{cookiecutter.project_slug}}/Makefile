@@ -1,5 +1,6 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration eval \
-        deploy-dev deploy-prod rollback health-check logs traces setup-gcp pre-commit clean help
+        deploy-dev deploy-prod rollback health-check logs traces setup-gcp setup-monitoring \
+        pre-commit clean help
 
 -include .env
 export
@@ -24,6 +25,7 @@ help:
 	@echo "  logs         Stream Cloud Logging output for this agent"
 	@echo "  traces       Open Cloud Trace in browser"
 	@echo "  setup-gcp    One-time GCP bootstrap: make setup-gcp [ENV=dev|prod] (default: prod)"
+	@echo "  setup-monitoring  One-time Cloud Monitoring dashboard + alert policy bootstrap"
 	@echo "  pre-commit   Run all pre-commit hooks on all files"
 	@echo "  clean        Remove build artefacts and caches"
 	@echo ""
@@ -86,6 +88,9 @@ traces:
 
 setup-gcp:
 	bash deployment/scripts/setup_gcp.sh $(or $(ENV),prod)
+
+setup-monitoring:
+	bash deployment/scripts/setup_monitoring.sh
 
 pre-commit:
 	uv run pre-commit run --all-files

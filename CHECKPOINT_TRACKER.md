@@ -1,7 +1,7 @@
 # Implementation Checkpoint Tracker
 
 **Last Updated:** 2026-08-20
-**Next Phase:** Phase 4 (Observability) — Checkpoint 4C
+**Next Phase:** None — all 9 planned checkpoints complete
 
 This file tracks the completion status of the implementation checkpoints.
 
@@ -13,8 +13,8 @@ This file tracks the completion status of the implementation checkpoints.
 |-------|--------|-------------|-----------|
 | Phase 2 | ✅ Complete | 3 (2A, 2B, 2C) | 3/3 |
 | Phase 3 | ✅ Complete | 3 (3A, 3B, 3C) | 3/3 |
-| Phase 4 | 🔄 In Progress | 3 (4A, 4B, 4C) | 2/3 |
-| **Total** | | **9** | **8/9** |
+| Phase 4 | ✅ Complete | 3 (4A, 4B, 4C) | 3/3 |
+| **Total** | | **9** | **9/9** |
 
 > **2026-08-20 — Phase 3 (Containerization) removed.** The original Phase 3 (Dockerfile,
 > build workflow, image-digest deploy config) was implemented as checkpoints 3A-3C, then fully
@@ -96,7 +96,7 @@ This file tracks the completion status of the implementation checkpoints.
 
 **Duration:** Weeks 7-8
 **Objectives:** Instrumentation, structured logging, monitoring, alerting, cost tracking
-**Status:** 🔄 IN PROGRESS
+**Status:** ✅ COMPLETE
 
 ### Checkpoint 4A: Core Instrumentation Library
 - [x] **Status:** Completed (2026-08-20)
@@ -128,11 +128,29 @@ This file tracks the completion status of the implementation checkpoints.
   Cloud Logging query examples in README.md and a log-field reference table in CLAUDE.md.
 
 ### Checkpoint 4C: Monitoring Dashboard & Alerting Rules
-- [ ] **Status:** Not started
+- [x] **Status:** Completed (2026-08-20)
 - **Scope:** Terraform dashboard config, alerting rules, notification channels, runbook
-- **Files:** {{cookiecutter.project_slug}}/gcp/monitoring/dashboard.tf, alerting.tf
-- **Validation:** `make validate` + `terraform validate gcp/monitoring/` in generated project
+- **Files:** {{cookiecutter.project_slug}}/deployment/monitoring/dashboard.json, deployment/monitoring/alerting/*.json, deployment/scripts/setup_monitoring.sh, Makefile, CLAUDE.md, README.md
+- **Validation:** `make validate` + `python -m json.tool` on the dashboard/alerting JSON + `grep thresholdValue` in generated project
 - **Commit:** `feat(monitoring): add Cloud Monitoring dashboard and alerting rules`
+- **Notes:** Asked the user up front (this template has zero Terraform anywhere; introducing it
+  solely for this one checkpoint would add a brand-new required CLI tool for every generated
+  project, and we'd already burned one full checkpoint cycle building-then-fully-reverting Docker
+  because it didn't match the actual Agent Engine deploy model). User chose plain `gcloud` CLI +
+  JSON configs, consistent with `setup_gcp.sh`/`deploy.py` — so `gcp/monitoring/*.tf` became
+  `deployment/monitoring/{dashboard.json, alerting/*.json}` + `setup_monitoring.sh`.
+  Metric names (`aiplatform.googleapis.com/reasoning_engine/{request_count,request_latencies,
+  cpu/allocation_time,memory/allocation_time}`, resource type `aiplatform.googleapis.com/
+  ReasoningEngine`) and the Dashboard/AlertPolicy JSON schemas (including the `denominatorFilter`
+  ratio-condition mechanism used for the error-rate alert) were verified against live Google Cloud
+  documentation via WebSearch/WebFetch rather than assumed, given how easy it is to hallucinate
+  plausible-looking metric type strings that silently do nothing in production. Caught and fixed a
+  real bash 3.2 (macOS default `/bin/bash`) `set -u` bug in `setup_monitoring.sh`: `"${arr[@]}"`
+  on a declared-but-empty array throws "unbound variable", and even the common `:-` guard produces
+  a spurious empty-string element rather than zero elements when passed through to `sys.argv` —
+  fixed by filtering blanks in the Python JSON-building one-liner instead of relying on the guard
+  alone. Rate-limit/quota alerting is explicitly NOT covered — no verified per-agent quota metric
+  exists to threshold on; documented as a manual Cloud Console step instead of fabricating one.
 
 ---
 
@@ -159,10 +177,9 @@ After each successful commit:
 
 ## Next Immediate Steps
 
-1. **Agent implementation:** Proceed to Checkpoint 3A (Rollback Procedure for Agent Engine)
-2. **Validation:** Run `make validate` at each checkpoint
-3. **Testing:** Ensure generated projects pass all tests after each change
-4. **Documentation:** Update README and CLAUDE.md as appropriate per each checkpoint
+All 9 checkpoints across Phases 2-4 are complete. No further checkpoint work is queued. If new
+scope emerges, add it as a new phase/checkpoint following the same pattern (Scope / Files /
+Validation / Commit Message / Agent Action) rather than reopening a completed one.
 
 ---
 

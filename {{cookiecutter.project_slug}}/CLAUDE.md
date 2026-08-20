@@ -85,6 +85,7 @@ tests/
 | `make logs` | Stream Cloud Logging |
 | `make traces` | Open Cloud Trace in browser |
 | `make setup-gcp` | One-time GCP bootstrap |
+| `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
 
 ## How to add a tool
 
@@ -283,6 +284,43 @@ uv run python deployment/scripts/health_check.py --message "hello"   # customize
 Exits `0` on success, `1` on failure, so it's safe to gate CI or a cron job on. `deploy.yml` runs
 it as its own step right after deploying, reading the resource name from `.agent_engine_resource`
 so it works whether that deploy created a new resource or updated an existing one.
+
+## Monitoring & alerting
+
+Vertex AI Agent Engine emits platform-level metrics automatically under the
+`aiplatform.googleapis.com/ReasoningEngine` monitored resource — no instrumentation needed for
+these (unlike the app-level structured logging in `agent/observability.py`):
+
+| Metric | Description |
+|---|---|
+| `reasoning_engine/request_count` | Request count, labeled by `response_code` / `response_code_class` |
+| `reasoning_engine/request_latencies` | Request latency distribution (ms) |
+| `reasoning_engine/cpu/allocation_time` | Container CPU allocation time |
+| `reasoning_engine/memory/allocation_time` | Container memory allocation time |
+
+`deployment/monitoring/` builds a dashboard and two alert policies on top of these, applied via
+plain `gcloud` (consistent with `setup_gcp.sh` — this template uses no Terraform):
+
+- `dashboard.json` — request count by response code, p50/p95/p99 latency, CPU/memory allocation
+- `alerting/error_rate.json` — 5xx response rate > 5% over 5 minutes (ratio condition via
+  `denominatorFilter`, matching total request count)
+- `alerting/latency_p95.json` — p95 request latency > 3000ms over 5 minutes
+
+```bash
+make setup-monitoring                                    # dashboard + alerts, no notifications
+ALERT_EMAIL=oncall@example.com make setup-monitoring      # + email notification channel
+SLACK_CHANNEL="#agent-alerts" SLACK_BOT_TOKEN=xoxb-... \
+  make setup-monitoring                                   # + Slack notification channel
+```
+
+Safe to re-run: it updates the existing dashboard/policies/channels by display name instead of
+creating duplicates. Run once per GCP project (dev and prod separately, same as `setup-gcp`).
+Preview a dashboard change first with `gcloud monitoring dashboards create --config-from-file=
+deployment/monitoring/dashboard.json --validate-only --project=$GOOGLE_CLOUD_PROJECT`.
+
+**Not covered here:** rate-limit/quota alerting. Vertex AI doesn't expose a per-agent quota metric
+to threshold on — configure that separately via Cloud Console → IAM & Admin → Quotas → Create
+Alert.
 
 ## CI/CD overview
 
