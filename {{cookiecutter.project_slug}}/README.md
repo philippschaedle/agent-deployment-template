@@ -60,10 +60,15 @@ make eval                 # promptfoo red-team evaluation
 ### Deploy to GCP
 
 ```bash
-make setup-gcp            # one-time GCP bootstrap (creates SA, bucket, key)
+make setup-gcp ENV=dev    # one-time GCP bootstrap for the dev project (creates SA, bucket, key)
+make setup-gcp ENV=prod   # same, for the prod project (ENV defaults to prod if omitted)
 make deploy-dev           # deploy to dev Agent Engine resource
 make deploy-prod          # deploy to prod
 ```
+
+`dev` and `prod` deploy via separate GitHub Environments with their own secrets and variables —
+see [Required GitHub Environments](CLAUDE.md#required-github-environments) in `CLAUDE.md` for
+exactly what to configure and where `setup-gcp`'s output goes.
 
 ## Make targets
 
@@ -77,9 +82,11 @@ make deploy-prod          # deploy to prod
 | `make typecheck` | Pyright |
 | `make deploy-dev` | Deploy to Agent Engine (dev) |
 | `make deploy-prod` | Deploy to Agent Engine (prod) |
+| `make rollback REF=<tag> [ENV=prod\|dev]` | Redeploy a previous git ref against the existing Agent Engine resource |
+| `make health-check` | Standalone smoke test against the deployed Agent Engine resource (no fresh deploy) |
 | `make logs` | Stream Cloud Logging |
 | `make traces` | Open Cloud Trace in browser |
-| `make setup-gcp` | One-time GCP bootstrap |
+| `make setup-gcp [ENV=dev\|prod]` | One-time GCP bootstrap (default: prod) |
 | `make pre-commit` | Run all pre-commit hooks |
 
 ## Environment variables

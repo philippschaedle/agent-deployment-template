@@ -248,5 +248,24 @@ so it works whether that deploy created a new resource or updated an existing on
 | `deploy.yml` | push to main | deploys to Agent Engine prod, then runs a standalone health check |
 | `cruft-check.yml` | push + PR + weekly | non-blocking: warns if `cruft update` is available from the template |
 
-Required GitHub Secrets: `GCP_SA_KEY`, `GOOGLE_CLOUD_PROJECT`, `GCS_STAGING_BUCKET`, `GOOGLE_API_KEY`  # pragma: allowlist secret
-Required GitHub Variables: `GOOGLE_CLOUD_LOCATION`, `MODEL_PROVIDER`, `AGENT_ENGINE_RESOURCE_NAME` (after first deploy)
+## Required GitHub Environments
+
+`deploy.yml`'s job targets a GitHub Environment named `dev` or `prod` (Settings → Environments →
+New environment), matching its `environment` `workflow_dispatch` input — a plain push to `main`
+defaults to `prod`. Each environment should point at its own GCP project, so dev and prod need
+their own **Environment secrets/variables** — not repository-level ones, which would make both
+environments share the same credentials:
+
+| Name | Kind | Scope | Description |
+|---|---|---|---|
+| `GCP_SA_KEY` | Secret | Per environment (`dev`, `prod`) | Base64 service-account key, printed by `make setup-gcp ENV=<dev\|prod>` |
+| `GOOGLE_CLOUD_PROJECT` | Secret | Per environment | That environment's GCP project ID |
+| `GCS_STAGING_BUCKET` | Secret | Per environment | Staging bucket for Agent Engine artefacts |
+| `GOOGLE_CLOUD_LOCATION` | Variable | Per environment | Vertex AI region |
+| `MODEL_PROVIDER` | Variable | Per environment | `google` \| `anthropic` \| `openai` \| `litellm` |
+| `AGENT_ENGINE_RESOURCE_NAME` | Variable | Per environment | Existing resource to update; set after that environment's first deploy |
+| `GOOGLE_API_KEY` | Secret | Repository-level | Used only by `eval.yml` (promptfoo), not per-environment  <!-- pragma: allowlist secret --> |
+
+Bootstrap each environment's GCP project with `make setup-gcp ENV=dev` / `make setup-gcp
+ENV=prod` (see [setup_gcp.sh](deployment/scripts/setup_gcp.sh)) — it prints exactly which secret
+or variable to add and to which environment.

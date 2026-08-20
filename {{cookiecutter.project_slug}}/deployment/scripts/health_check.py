@@ -10,6 +10,7 @@ Usage:
     uv run python deployment/scripts/health_check.py
     uv run python deployment/scripts/health_check.py --message "hello" --user-id healthcheck
 """
+
 import argparse
 import logging
 import os
@@ -22,7 +23,9 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def run_smoke_test(remote_agent, message: str = "ping", user_id: str = "smoke-test") -> bool:
+def run_smoke_test(
+    remote_agent, message: str = "ping", user_id: str = "smoke-test"
+) -> bool:
     """Send `message` to `remote_agent` and require at least one event back.
 
     `remote_agent` is whatever `agent_engines.create/update/get` returns — a
@@ -71,7 +74,9 @@ if __name__ == "__main__":
         description="Run a standalone health check against a deployed Agent Engine resource"
     )
     parser.add_argument(
-        "--message", default="ping", help="Message to send for the smoke test (default: ping)"
+        "--message",
+        default="ping",
+        help="Message to send for the smoke test (default: ping)",
     )
     parser.add_argument(
         "--user-id",

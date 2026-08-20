@@ -1,4 +1,5 @@
 """Unit tests for the standalone health check — no network, no GCP credentials required."""
+
 from unittest.mock import Mock
 
 from deployment.scripts.health_check import run_smoke_test

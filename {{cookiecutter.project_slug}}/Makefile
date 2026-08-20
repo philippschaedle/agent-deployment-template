@@ -23,7 +23,7 @@ help:
 	@echo "  health-check Run a standalone smoke test against the deployed Agent Engine resource"
 	@echo "  logs         Stream Cloud Logging output for this agent"
 	@echo "  traces       Open Cloud Trace in browser"
-	@echo "  setup-gcp    One-time GCP project bootstrap"
+	@echo "  setup-gcp    One-time GCP bootstrap: make setup-gcp [ENV=dev|prod] (default: prod)"
 	@echo "  pre-commit   Run all pre-commit hooks on all files"
 	@echo "  clean        Remove build artefacts and caches"
 	@echo ""
@@ -85,7 +85,7 @@ traces:
 	bash deployment/scripts/read_traces.sh
 
 setup-gcp:
-	bash deployment/scripts/setup_gcp.sh
+	bash deployment/scripts/setup_gcp.sh $(or $(ENV),prod)
 
 pre-commit:
 	uv run pre-commit run --all-files

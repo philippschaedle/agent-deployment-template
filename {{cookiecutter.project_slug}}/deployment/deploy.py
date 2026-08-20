@@ -5,6 +5,7 @@ Usage:
     uv run python deployment/deploy.py --env dev
     uv run python deployment/deploy.py --env prod
 """
+
 import argparse
 import logging
 import os
@@ -61,7 +62,7 @@ def deploy(env: str) -> None:
             requirements=requirements,
             extra_packages=extra_packages,
             gcs_dir_name=config.gcs_dir_name,
-            )
+        )
     else:
         logger.info("  Creating new Agent Engine resource...")
         remote_agent = agent_engines.create(
@@ -88,7 +89,9 @@ def deploy(env: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Deploy agent to Vertex AI Agent Engine")
+    parser = argparse.ArgumentParser(
+        description="Deploy agent to Vertex AI Agent Engine"
+    )
     parser.add_argument(
         "--env",
         choices=["dev", "prod"],

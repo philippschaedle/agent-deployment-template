@@ -19,6 +19,11 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   now `deployment/scripts/health_check.py`, runnable against an existing Agent Engine resource
   without a fresh deploy. Exposed as `make health-check` and wired into `deploy.yml` as its own
   step after deploy (clear 0/1 exit codes for CI gating).
+- Documented dev/prod environment separation: a "Required GitHub Environments" table in the
+  generated `CLAUDE.md` spells out which secrets/variables belong to the `dev` and `prod`
+  GitHub Environments (vs. the one repository-level secret used only by `eval.yml`).
+  `setup_gcp.sh` now takes a `dev`/`prod` argument (`make setup-gcp ENV=dev`) and prints
+  instructions scoped to that environment instead of generic repository secrets.
 
 ## [1.1.0] - 2026-07-20
 
