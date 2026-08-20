@@ -24,6 +24,11 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   GitHub Environments (vs. the one repository-level secret used only by `eval.yml`).
   `setup_gcp.sh` now takes a `dev`/`prod` argument (`make setup-gcp ENV=dev`) and prints
   instructions scoped to that environment instead of generic repository secrets.
+- Core observability library: `agent/observability.py` adds structured JSON logging
+  (`log_event`), an `@instrument` decorator that logs name/duration/outcome for tool calls
+  (applied to both example tools), PII redaction (email/SSN/credit-card patterns), and
+  `log_model_usage()` for token-count logging where the event stream is iterated directly
+  (the promptfoo eval provider). Documented in the generated project's `CLAUDE.md`.
 
 ## [1.1.0] - 2026-07-20
 

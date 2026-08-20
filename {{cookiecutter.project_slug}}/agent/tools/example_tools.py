@@ -4,14 +4,17 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 
+from agent.observability import instrument
 from agent.tools.response_models import SearchResult
 
 
+@instrument
 def get_current_datetime() -> str:
     """Return the current UTC date and time as an ISO 8601 string."""
     return datetime.now(tz=UTC).isoformat()
 
 
+@instrument
 def web_search(query: str) -> list[SearchResult]:
     """Search the web and return a list of relevant results.
 

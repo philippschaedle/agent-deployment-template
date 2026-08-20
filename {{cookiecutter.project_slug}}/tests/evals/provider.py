@@ -2,6 +2,7 @@
 
 Promptfoo calls call_api(prompt, options, context) for each test case.
 """
+
 import asyncio
 import os
 import sys
@@ -20,6 +21,7 @@ async def _run_agent(prompt: str) -> str:
     from google.genai import types
 
     from agent.agent import root_agent
+    from agent.observability import log_model_usage
 
     session_service = InMemorySessionService()
     runner = Runner(
@@ -40,6 +42,7 @@ async def _run_agent(prompt: str) -> str:
         session_id=session.id,
         new_message=content,
     ):
+        log_model_usage(event)
         if event.is_final_response() and event.content and event.content.parts:
             return event.content.parts[0].text or ""
     return ""

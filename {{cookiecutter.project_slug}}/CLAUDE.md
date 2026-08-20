@@ -38,9 +38,10 @@ make setup-gcp   # creates SA, enables APIs, generates key for CI
 agent/
   __init__.py          load_prompt() — reads prompts/prompts.yaml and concatenates .md files
   agent.py             root_agent definition (ADK syntax; this is the entrypoint)
+  observability.py     log_event(), @instrument, redact_pii() — see Observability below
   tools/
     __init__.py        re-exports all tools
-    example_tools.py   get_current_datetime, web_search
+    example_tools.py   get_current_datetime, web_search (both @instrument-wrapped)
     response_models.py Pydantic schemas for tool return types
 prompts/
   prompts.yaml         registry: which .md files load into which agents
@@ -106,6 +107,29 @@ def my_tool(param: str) -> str:
     """
     ...
 ```
+
+Wrap new tools with `@instrument` from `agent/observability.py` (see Observability below) the same
+way `get_current_datetime` and `web_search` are — `functools.wraps` keeps ADK's tool-schema
+introspection working unchanged, verified by comparing `FunctionTool` declarations before/after.
+
+## Observability
+
+`agent/observability.py` provides structured JSON logging, applied at the boundary this project
+actually controls — tool calls — rather than `Runner.run_async`, which Agent Engine's managed
+runtime drives internally and which our code never touches in production:
+
+- **`@instrument`** — wraps a tool function (sync or async) and logs `<name>.start`,
+  `<name>.end` (with `duration_ms`), or `<name>.error` (with the exception message) as JSON.
+  Already applied to both tools in `agent/tools/example_tools.py`.
+- **`log_event(event_type, fields)`** — emit one structured JSON line for anything else worth
+  recording. Cloud Logging parses a JSON stdout line into `jsonPayload` automatically.
+- **`redact_pii(value)`** — recursively redacts emails, SSNs, and credit-card-shaped numbers from
+  strings, dicts, and lists. `log_event` and `@instrument` both redact fields before logging them,
+  but it's a defence-in-depth measure, not a substitute for not logging sensitive fields in the
+  first place.
+- **`log_model_usage(event)`** — logs token counts from an ADK event's `usage_metadata`, for code
+  that iterates the event stream itself (the promptfoo eval provider does); not reachable from
+  Agent Engine's own request path for the same reason `@instrument` doesn't wrap `Runner.run_async`.
 
 ## How to modify prompts
 
