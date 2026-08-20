@@ -13,6 +13,11 @@ on:
         options:
           - dev
           - prod
+      ref:
+        description: "Git ref to deploy (tag, branch, or SHA). Defaults to the triggering ref — set this to roll back to a previous release."
+        required: false
+        default: ""
+        type: string
 
 jobs:
   deploy:
@@ -21,6 +26,8 @@ jobs:
     environment: {% raw %}${{ github.event.inputs.environment || 'prod' }}{% endraw %}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: {% raw %}${{ github.event.inputs.ref || github.sha }}{% endraw %}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -54,5 +61,6 @@ jobs:
           echo "## Deployment successful" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "**Environment:** {% raw %}${{ github.event.inputs.environment || 'prod' }}{% endraw %}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Ref:** {% raw %}${{ github.event.inputs.ref || github.sha }}{% endraw %}" >> "$GITHUB_STEP_SUMMARY"
           echo "**Resource:**" >> "$GITHUB_STEP_SUMMARY"
           cat .agent_engine_resource >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "N/A" >> "$GITHUB_STEP_SUMMARY"

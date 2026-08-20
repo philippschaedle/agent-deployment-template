@@ -1,5 +1,5 @@
 .PHONY: install dev lint format typecheck test test-unit test-integration eval \
-        deploy-dev deploy-prod logs traces setup-gcp pre-commit clean help
+        deploy-dev deploy-prod rollback logs traces setup-gcp pre-commit clean help
 
 -include .env
 export
@@ -19,6 +19,7 @@ help:
 	@echo "  eval              Run promptfoo skill evaluations"
 	@echo "  deploy-dev   Deploy to Agent Engine (dev)"
 	@echo "  deploy-prod  Deploy to Agent Engine (prod)"
+	@echo "  rollback     Redeploy a previous git ref: make rollback REF=<tag> [ENV=prod|dev]"
 	@echo "  logs         Stream Cloud Logging output for this agent"
 	@echo "  traces       Open Cloud Trace in browser"
 	@echo "  setup-gcp    One-time GCP project bootstrap"
@@ -58,6 +59,20 @@ deploy-dev:
 
 deploy-prod:
 	uv run python deployment/deploy.py --env prod
+
+rollback:
+	@if [ -z "$(REF)" ]; then \
+		echo "Usage: make rollback REF=<tag> [ENV=prod|dev]"; \
+		exit 1; \
+	fi
+	@echo "Rolling back to $(REF) (env: $(or $(ENV),prod))..."
+	git fetch --tags --quiet
+	@branch=$$(git rev-parse --abbrev-ref HEAD); \
+	git checkout $(REF) && \
+	uv run python deployment/deploy.py --env $(or $(ENV),prod); \
+	status=$$?; \
+	git checkout "$$branch"; \
+	exit $$status
 
 logs:
 	bash deployment/scripts/read_logs.sh

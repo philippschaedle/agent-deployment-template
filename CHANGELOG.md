@@ -9,6 +9,13 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ## [Unreleased]
 
+### Added
+
+- Rollback support for Agent Engine deployments: `deploy.yml` accepts an optional `ref`
+  `workflow_dispatch` input (defaults to the triggering ref), and generated projects get a
+  `make rollback REF=<tag> [ENV=prod|dev]` target that redeploys a previous git ref against the
+  existing Agent Engine resource. Documented in the generated project's `CLAUDE.md`.
+
 ## [1.1.0] - 2026-07-20
 
 First cruft-aware release: generated projects can now track and pull in template updates

@@ -79,6 +79,7 @@ tests/
 | `make pre-commit` | All pre-commit hooks |
 | `make deploy-dev` | Deploy to Agent Engine (dev) |
 | `make deploy-prod` | Deploy to Agent Engine (prod) |
+| `make rollback REF=<tag> [ENV=prod\|dev]` | Redeploy a previous git ref against the existing Agent Engine resource |
 | `make logs` | Stream Cloud Logging |
 | `make traces` | Open Cloud Trace in browser |
 | `make setup-gcp` | One-time GCP bootstrap |
@@ -195,6 +196,27 @@ Run `cz bump` (via `uv run cz bump`) to cut a release and move unreleased entrie
 | `/deploy` | Runs `make deploy-prod` and reports the resource name |
 | `/eval` | Runs `make eval` and summarises results |
 | `/logs` | Runs `make logs` and streams Cloud Logging output |
+
+## Rollback
+
+Agent Engine deploys are **source-based** (`agent_engines.create`/`update` pickles `root_agent`
+directly) — there is no container image digest to pin a rollback to. Rolling back means checking
+out a previous git ref and redeploying it against the *existing* `AGENT_ENGINE_RESOURCE_NAME`,
+which `deploy.py` updates in place rather than creating a new resource.
+
+**Locally:**
+
+```bash
+make rollback REF=v1.2.0                # redeploys v1.2.0 to prod
+make rollback REF=v1.2.0 ENV=dev        # redeploys v1.2.0 to dev
+```
+
+This checks out `REF`, runs `deployment/deploy.py --env <ENV>`, and restores your original branch
+afterwards regardless of whether the deploy succeeds.
+
+**Via GitHub Actions:** manually trigger the `deploy.yml` workflow (Actions tab → Deploy → Run
+workflow) and set the `ref` input to the tag, branch, or SHA you want to roll back to, alongside
+the `environment` input. Leaving `ref` empty deploys the triggering ref as usual.
 
 ## CI/CD overview
 
