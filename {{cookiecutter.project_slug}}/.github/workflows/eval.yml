@@ -33,7 +33,7 @@ jobs:
         env:
           PROMPTFOO_DISABLE_TELEMETRY: "1"
           MODEL_PROVIDER: google
-          GOOGLE_API_KEY: {% raw %}${{ secrets.GOOGLE_API_KEY }}{% endraw %}
+          GOOGLE_API_KEY: "{% raw %}${{ secrets.GOOGLE_API_KEY }}{% endraw %}"
 
       - name: Upload results
         if: always()
