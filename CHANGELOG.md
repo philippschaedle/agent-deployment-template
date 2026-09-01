@@ -51,6 +51,20 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   `promptfoo.yaml`'s `threshold` (90%), rather than trusting promptfoo's bare exit code.
   Verified against both a reproduced 20-error run (correctly fails) and a synthetic
   18/2/0 (90% exactly at threshold) run (correctly passes).
+- `hooks/post_gen_project.py`'s initial-commit fix (below) had its own bug: it ran
+  `uv sync` (which writes `uv.lock`) *after* `git add -A` + the initial commit, so every
+  freshly generated project left `uv.lock` untracked — despite `.gitignore` explicitly
+  saying `# uv.lock is committed — do not add it here`. Confirmed via a real CI run:
+  `astral-sh/setup-uv`'s cache step failed immediately with `No file matched to
+  [**/uv.lock]` since the pushed repo never had it. Reordered so `uv sync` runs before
+  `git add -A`/the commit; verified with a fresh generation that `uv.lock` (3717 lines) is
+  now part of the initial commit and the tree is clean afterward.
+- `hooks/post_gen_project.py` ran `git init` and `git add -A` but never committed —
+  every generated project started with all files staged but zero commits, so
+  `git log`/`gh repo create --push`/anything assuming an initial commit existed would
+  fail immediately. Now commits (`chore: initial commit from agent-deployment-template`)
+  right after staging, before pre-commit hooks are installed, so the initial commit isn't
+  blocked by autofixing hooks (ruff/markdownlint) rewriting files mid-commit.
 
 ### Added
 

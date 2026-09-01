@@ -90,15 +90,13 @@ write_cruft_json()
 # Initialise git
 print("\n> Initialising git repository...")
 run("git init")
-run("git add -A")
 
-# Install dependencies and pre-commit hooks
+# Run uv sync before the initial commit below, not after — it writes uv.lock, and
+# .gitignore deliberately does NOT exclude uv.lock (it's meant to be committed). Syncing
+# first means `git add -A` below actually picks it up, instead of leaving it untracked.
 if uv_available():
     print("\n> Installing dependencies with uv...")
     run("uv sync")
-    print("\n> Installing pre-commit hooks...")
-    run("uv run pre-commit install")
-    run("uv run pre-commit install --hook-type commit-msg")
 else:
     print(
         "\nWARNING: uv not found. Install from https://docs.astral.sh/uv/ then run:\n"
@@ -106,6 +104,16 @@ else:
         "  uv run pre-commit install\n"
         "  uv run pre-commit install --hook-type commit-msg"
     )
+
+run("git add -A")
+# Commit before installing pre-commit hooks below, so this initial commit isn't subject
+# to hook enforcement (autofixes from ruff/markdownlint would otherwise block it).
+run('git commit -m "chore: initial commit from agent-deployment-template"')
+
+if uv_available():
+    print("\n> Installing pre-commit hooks...")
+    run("uv run pre-commit install")
+    run("uv run pre-commit install --hook-type commit-msg")
 
 print(
     f"""
