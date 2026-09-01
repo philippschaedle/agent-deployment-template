@@ -20,6 +20,37 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   `tests/integration` together in one invocation and enforces the 75% bar against their
   combined coverage (96% in the template's own example agent) — the check CI was always
   meant to be doing.
+- Generated `eval.yml` pinned Node 20 for the promptfoo evaluation step, but promptfoo
+  requires Node >=22.22.0 — `eval.yml` failed on every PR with an `EBADENGINE` error before
+  ever reaching the actual evaluation. Bumped to Node 22.
+- Generated `eval.yml` passed `--ci` to `promptfoo eval`, which is not a recognized flag on
+  current promptfoo (`error: unknown option '--ci'`, confirmed against its own `--help`
+  output) — every generated project's eval job failed on every PR before attempting any
+  evaluation, independent of the Node-version fix above. Removed `--ci` and added
+  `-o output.json` so the existing "Upload results" step has a file to upload.
+- **The eval CI job likely never actually worked, for any generated project, until now.**
+  `eval.yml` ran `npx --yes promptfoo@latest eval ...` bare, with no `uv run` wrapper.
+  promptfoo's `python:provider.py` provider spawns its own Python worker to import
+  `tests/evals/provider.py`, which needs this project's dependencies (`python-dotenv`,
+  `google-adk`, ...) — installed by `uv sync` into `.venv`, not into the bare system Python
+  `actions/setup-python` puts on `PATH`. Confirmed via a real CI run with a valid
+  `GOOGLE_API_KEY`: all 20 test cases failed with `ModuleNotFoundError: No module named
+  'dotenv'`, before ever reaching a real model call. `make eval`'s local path
+  (`tests/evals/run_eval.py`) never hit this, since it's invoked via `uv run python ...`,
+  which activates `.venv` for the whole subprocess tree it spawns (`npx` → node →
+  promptfoo's Python worker) — CI's direct `npx` invocation had no equivalent activation.
+  Fixed by wrapping the CI invocation in `uv run` too, matching the working local path.
+- **Security-relevant:** `eval.yml` relied on `promptfoo eval`'s own exit code to gate the
+  PR check, but verified empirically that promptfoo exits `0` even when every test case
+  errors out (100% errors, 0% successes reproduced a clean exit 0 locally) — e.g. an
+  invalid or expired `GOOGLE_API_KEY` would make every eval case error, and the `Eval`
+  check would still report green. Since this gate covers the `safety_injection`/
+  `safety_pii` datasets, a silent false-pass here is a real regression, not a minor gap.
+  Added an explicit "Enforce evaluation results" step that reads `output.json`'s
+  `results.stats` directly and fails the job on any `errors` or on a pass rate below
+  `promptfoo.yaml`'s `threshold` (90%), rather than trusting promptfoo's bare exit code.
+  Verified against both a reproduced 20-error run (correctly fails) and a synthetic
+  18/2/0 (90% exactly at threshold) run (correctly passes).
 
 ### Added
 

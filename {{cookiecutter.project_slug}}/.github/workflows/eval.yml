@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - uses: astral-sh/setup-uv@v4
         with:
@@ -29,11 +29,60 @@ jobs:
       - run: uv sync
 
       - name: Run promptfoo evaluation
-        run: npx --yes promptfoo@latest eval --config tests/evals/promptfoo.yaml --ci
+        # --ci isn't a recognized promptfoo eval flag (checked against current --help).
+        # -o writes the output.json the next two steps read/upload. Deliberately not
+        # relying on this step's own exit code — verified empirically that promptfoo exits
+        # 0 even when every test case errors out (e.g. a bad API key), so pass/fail is
+        # enforced explicitly in "Enforce evaluation results" below instead.
+        # `uv run` matters here: promptfoo's python:provider.py provider spawns its own
+        # Python worker to import tests/evals/provider.py, which needs this project's
+        # deps (python-dotenv, google-adk, ...) from .venv. Without `uv run`, that worker
+        # gets the bare system Python from actions/setup-python instead, which never had
+        # `uv sync`'s deps installed — confirmed via a real CI run: every case failed with
+        # `ModuleNotFoundError: No module named 'dotenv'`. `make eval`'s local path
+        # (tests/evals/run_eval.py, invoked via `uv run python ...`) never hit this because
+        # `uv run` already activates .venv for the whole subprocess tree it spawns.
+        run: uv run npx --yes promptfoo@latest eval --config tests/evals/promptfoo.yaml --no-progress-bar -o output.json
         env:
           PROMPTFOO_DISABLE_TELEMETRY: "1"
           MODEL_PROVIDER: google
           GOOGLE_API_KEY: "{% raw %}${{ secrets.GOOGLE_API_KEY }}{% endraw %}"
+
+      - name: Enforce evaluation results
+        # promptfoo's own exit code doesn't reflect errors (only, maybe, assertion
+        # failures) — read output.json directly and fail on any error or a pass rate below
+        # promptfoo.yaml's threshold, since neither is safe to treat as a passing eval.
+        run: |
+          uv run python3 - <<'EOF'
+          import json
+          import sys
+
+          import yaml
+
+          with open("tests/evals/promptfoo.yaml") as f:
+              threshold = yaml.safe_load(f).get("threshold", 1.0)
+
+          with open("output.json") as f:
+              stats = json.load(f)["results"]["stats"]
+
+          successes = stats["successes"]
+          failures = stats["failures"]
+          errors = stats["errors"]
+          total = successes + failures + errors
+          pass_rate = successes / total if total else 0.0
+
+          print(
+              f"successes={successes} failures={failures} errors={errors} "
+              f"pass_rate={pass_rate:.2%} threshold={threshold:.0%}"
+          )
+
+          if errors:
+              print(f"::error::{errors} test case(s) errored (could not complete) — treated as failing.")
+              sys.exit(1)
+          if pass_rate < threshold:
+              print(f"::error::Pass rate {pass_rate:.2%} is below the required threshold {threshold:.0%}.")
+              sys.exit(1)
+          EOF
 
       - name: Upload results
         if: always()
