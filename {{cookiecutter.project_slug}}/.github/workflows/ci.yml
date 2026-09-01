@@ -55,14 +55,10 @@ jobs:
       - run: uv sync
 
       - name: Run unit tests
-        run: uv run pytest tests/unit -v
-
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: htmlcov/
+        # No coverage enforcement here — tests/unit alone was never meant to hit the
+        # project-wide 75% bar on its own. The `coverage` job below checks that against
+        # the full suite instead.
+        run: uv run pytest tests/unit -v --no-cov
 
   integration-test:
     name: Integration tests (mocked LLM)
@@ -83,8 +79,42 @@ jobs:
       - run: uv sync
 
       - name: Run integration tests
-        run: uv run pytest tests/integration -v --tb=short
+        # No coverage enforcement here either — see the `test` job's comment above.
+        run: uv run pytest tests/integration -v --tb=short --no-cov
         env:
           # Use Google provider so resolve_model() returns a plain string —
           # the Runner is mocked before any network call is made.
           MODEL_PROVIDER: google
+
+  coverage:
+    name: Coverage (full suite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "{{cookiecutter.python_version}}"
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          ignore-nothing-to-cache: true
+
+      - run: uv sync
+
+      - name: Run full test suite with coverage
+        # Runs unit + integration together in one pytest invocation, so the project-wide
+        # 75% coverage bar (pyproject.toml's --cov-fail-under=75) is checked against what
+        # the two suites cover combined — neither one alone was ever meant to clear it.
+        run: uv run pytest tests/unit tests/integration -v
+        env:
+          MODEL_PROVIDER: google
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/

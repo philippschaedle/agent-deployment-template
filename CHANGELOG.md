@@ -9,6 +9,18 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ## [Unreleased]
 
+### Fixed
+
+- Generated `ci.yml`'s `test` and `integration-test` jobs each ran `pytest` against only
+  `tests/unit` or only `tests/integration`, but both were still held to the project-wide
+  `--cov-fail-under=75` bar (`pyproject.toml`) — a bar neither suite was ever meant to
+  clear alone. `integration-test` failed this way on every PR, deterministically (66%
+  coverage from `tests/integration` alone vs. the 75% requirement), regardless of code
+  quality. Both jobs now run with `--no-cov`; a new `coverage` job runs `tests/unit` and
+  `tests/integration` together in one invocation and enforces the 75% bar against their
+  combined coverage (96% in the template's own example agent) — the check CI was always
+  meant to be doing.
+
 ### Added
 
 - Rollback support for Agent Engine deployments: `deploy.yml` accepts an optional `ref`
