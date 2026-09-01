@@ -53,7 +53,16 @@ venv = ".venv"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=agent --cov-report=term-missing --cov-fail-under=75"
+# Covers deployment/ as well as agent/. deploy.py ships the pickled agent to production and
+# is the highest-blast-radius code here, so it belongs under the gate rather than outside it.
+addopts = "--cov=agent --cov=deployment --cov-report=term-missing --cov-fail-under=75"
+
+[tool.coverage.report]
+exclude_also = [
+    # argparse entry points in deploy.py / health_check.py. No import-based test can reach
+    # these, so counting them only depresses the number without saying anything useful.
+    "if __name__ == .__main__.:",
+]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

@@ -101,6 +101,16 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Added
 
+- **Coverage now measures `deployment/`, not just `agent/`.** `pyproject.toml` scoped
+  `--cov=agent`, so the reported 96% said nothing about the deployment path — and
+  `deploy.py`, which pickles the agent and ships it to Agent Engine, had **zero tests
+  anywhere**: not in generated projects, not in this template repo. It is the
+  highest-blast-radius file in the template and was entirely unguarded. Scope is now
+  `--cov=agent --cov=deployment`, with a `[tool.coverage.report] exclude_also` for the
+  `if __name__ == "__main__":` argparse blocks in `deploy.py`/`health_check.py`, which no
+  import-based test can reach. Widening the scope alone would have measured 74% and broken
+  the 75% gate for every generated project; with the new tests below it measures **97.76%**
+  (223 statements, 5 missed — all pre-existing, in `agent/observability.py`).
 - Unit tests for the deploy path (`tests/unit/test_deploy.py`, 12 cases) taking
   `deployment/deploy.py` from 0% to 100%. Every cloud import in `deploy()` is function-local,
   so patching `vertexai.init`, `vertexai.agent_engines.get/create` and `run_smoke_test` at
