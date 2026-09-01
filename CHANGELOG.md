@@ -101,6 +101,20 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Added
 
+- Unit tests for the deploy path (`tests/unit/test_deploy.py`, 12 cases) taking
+  `deployment/deploy.py` from 0% to 100%. Every cloud import in `deploy()` is function-local,
+  so patching `vertexai.init`, `vertexai.agent_engines.get/create` and `run_smoke_test` at
+  their source keeps the tests fully offline — nothing is pickled, uploaded or billed. Pins
+  the behaviour that breaks silently: create-vs-update selection, `extra_packages` shipping
+  both `agent` and `prompts` (the pickled agent references `agent.tools.*` by module path),
+  `display_name` being sent on create but not on update, `.agent_engine_resource` being
+  written for CI to read, and — most importantly — a failed smoke test exiting `1` rather
+  than being logged and ignored. Also documents that `--env dev|prod` is informational only:
+  it retargets nothing, since project/location/bucket all come from the environment.
+- Unit tests for `check_resource` (`tests/unit/test_health_check.py`, 5 new cases) taking
+  `deployment/scripts/health_check.py` from 50% to 100%. Covers the early return when
+  `AGENT_ENGINE_RESOURCE_NAME` is unset — verifying `vertexai.init` is never called, so a
+  health check can never accidentally become a deploy.
 - Unit tests for `deployment/config.py` (`tests/unit/test_config.py`, 16 cases). Neither
   `resolve_model` nor `DeploymentConfig.from_env` had any test coverage, and because
   `pyproject.toml` scoped coverage to `--cov=agent`, the reported 96% never included
