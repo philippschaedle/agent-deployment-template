@@ -11,6 +11,14 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Fixed
 
+- **Generating with `python_version=3.12` produced a project that failed its own
+  `ruff check` on the very first CI run.** With `target-version = "py312"`, ruff's `UP047`
+  fires on `agent/observability.py`'s `def instrument(func: F) -> F`, demanding PEP 695
+  generics (`def instrument[F](...)`) — 3.12+ syntax the template source cannot use,
+  because the same source must also render and parse under Python 3.11. One of the two
+  allowed values of a cookiecutter variable therefore shipped a broken project.
+  `UP046`/`UP047` are now in the generated `pyproject.toml`'s ruff `ignore` list, with a
+  comment explaining that they are safe to drop if 3.11 support is not wanted.
 - **Six template source files were not `ruff format` clean, so `ci.yml`'s
   `lint-format-typecheck` job failed on the first PR of every generated project.** The
   generated `ci.yml` runs `uv run ruff format --check .`, but nothing in this template repo

@@ -34,7 +34,12 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "N"]
-ignore = ["E501"]
+# UP046/UP047 want PEP 695 generics (`def instrument[F](func: F) -> F`), which are 3.12+
+# syntax. This project's sources come from a cookiecutter template that must also render
+# and parse under Python 3.11, so they stay suppressed even when target-version is py312 —
+# without this, generating with python_version=3.12 produces a project that fails its own
+# `ruff check` on the first CI run. Safe to drop if you never intend to support 3.11.
+ignore = ["E501", "UP046", "UP047"]
 
 [tool.ruff.format]
 quote-style = "double"
