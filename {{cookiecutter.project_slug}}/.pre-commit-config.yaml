@@ -16,7 +16,11 @@ repos:
     hooks:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
-        exclude: uv\.lock
+        # .cruft.json holds the template's git SHA, which HexHighEntropyString flags as a
+        # secret. It differs per generated project and changes on every `cruft update`, so
+        # it cannot be pinned in .secrets.baseline. The file is machine-generated cookiecutter
+        # metadata — nothing sensitive is ever written there.
+        exclude: ^(uv\.lock|\.cruft\.json)$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

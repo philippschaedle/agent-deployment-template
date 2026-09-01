@@ -20,6 +20,19 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   (`Failed to parse version: >={{cookiecutter.python_version}}`). Reformatted
   `deployment/config.py`, `tests/integration/test_agent_runner.py`, and four
   `tests/unit/test_*.py` files.
+- Freshly generated projects failed their own `make pre-commit` before their author had
+  written a line of code, on two hooks:
+  - `end-of-file-fixer` rewrote `LICENSE` — un-trimmed Jinja block tags left the rendered
+    file with both a leading blank line and a trailing one. The `{% if %}`/`{% elif %}`
+    tags now sit on the same line as the license text they introduce (preserving the
+    Apache banner's indentation, which a `-%}` strip marker would have eaten), and
+    `{% endif -%}` absorbs the template's own trailing newline.
+  - `detect-secrets` flagged `.cruft.json` as a `HexHighEntropyString` — it holds the
+    template's 40-character git SHA. That SHA differs per generated project and changes on
+    every `cruft update`, so it cannot be pinned in `.secrets.baseline`; the file is now
+    excluded from the hook. Previously masked in testing because plain
+    `cookiecutter . --no-input` records an empty `commit` field, while the documented
+    `cruft create gh:org/repo` flow records a real SHA and always tripped it.
 - Generated `ci.yml`'s `test` and `integration-test` jobs each ran `pytest` against only
   `tests/unit` or only `tests/integration`, but both were still held to the project-wide
   `--cov-fail-under=75` bar (`pyproject.toml`) — a bar neither suite was ever meant to
