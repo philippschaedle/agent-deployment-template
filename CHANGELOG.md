@@ -101,6 +101,18 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Added
 
+- Unit tests for `deployment/config.py` (`tests/unit/test_config.py`, 16 cases). Neither
+  `resolve_model` nor `DeploymentConfig.from_env` had any test coverage, and because
+  `pyproject.toml` scoped coverage to `--cov=agent`, the reported 96% never included
+  `deployment/` at all (since widened — see above). The cookiecutter `model_provider`
+  answer does not gate
+  `resolve_model`'s branches — they are selected at runtime from `MODEL_PROVIDER` — so
+  generating a project per provider could never have exercised them; tests are the only
+  thing that can. Covers all four providers, the unknown-provider `ValueError`, the
+  `litellm`-without-`LITELLM_MODEL` `KeyError`, and `from_env`'s `europe-west1` default
+  (locking the code to what `README.md`/`CLAUDE.md` document) and empty-string
+  `AGENT_ENGINE_RESOURCE_NAME` handling. `LiteLlm(...)` construction needs no API key and
+  makes no network call, so every case is offline and deterministic.
 - Rollback support for Agent Engine deployments: `deploy.yml` accepts an optional `ref`
   `workflow_dispatch` input (defaults to the triggering ref), and generated projects get a
   `make rollback REF=<tag> [ENV=prod|dev]` target that redeploys a previous git ref against the
