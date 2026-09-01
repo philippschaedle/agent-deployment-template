@@ -36,7 +36,13 @@ chore(deps): bump google-adk to 1.2.0
 docs(readme): add traces section
 ```
 
-The `commit-msg` pre-commit hook enforces this. Non-conforming commits are rejected.
+Allowed types: `build`, `bump`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+`revert`, `style`, `test`.
+
+The `commit-msg` pre-commit hook rejects non-conforming commit messages locally, and
+`lint-pr.yml` applies the same rule to your **PR title** in CI — which matters because a
+squash merge uses the PR title, not your commit messages, as the subject of the commit that
+lands on `main`.
 
 ## Pull request requirements
 

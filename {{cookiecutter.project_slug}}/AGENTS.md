@@ -122,7 +122,8 @@ Set `MODEL_PROVIDER` in `.env`:
 ## Code conventions
 
 - **No `print()` in Python package code** — use `logging`
-- **Conventional commits**: `feat(scope): description` — enforced by commitizen
+- **Conventional commits**: `feat(scope): description` — enforced by commitizen locally and
+  by `lint-pr.yml` on the PR title (squash merges use the title, not your commit messages)
 - **Pre-commit hooks**: ruff (lint + format), pyright, detect-secrets, markdownlint
   - Run `make pre-commit` before committing; never use `--no-verify`
 - **CHANGELOG**: update `CHANGELOG.md` under `[Unreleased]` for every user-facing change
@@ -131,7 +132,8 @@ Set `MODEL_PROVIDER` in `.env`:
 
 | Workflow | Trigger | What it checks |
 |---|---|---|
-| `ci.yml` | push + PR | lint, format, typecheck, unit tests |
+| `ci.yml` | push + PR | lint, format, typecheck, unit tests, combined-suite coverage |
+| `lint-pr.yml` | PR opened/edited | PR title is a valid conventional commit |
 | `security.yml` | push to main + weekly | CodeQL, pip-audit, secret scan |
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
 | `deploy.yml` | push to main | deploy to Agent Engine prod |

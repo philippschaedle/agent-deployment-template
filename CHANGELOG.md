@@ -101,6 +101,20 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Added
 
+- **Conventional-commit enforcement on PR titles in generated projects** (`lint-pr.yml`).
+  The workflow previously existed only in the template repo and did not propagate, so
+  generated projects had no server-side enforcement at all — only the local `commit-msg`
+  hook. That gap mattered more than it looks: commitizen validates *commit messages on the
+  contributor's branch*, but a squash merge discards those and uses the **PR title** as the
+  subject of the commit that lands on `main` — the one `cz bump` reads to build
+  `CHANGELOG.md`. The local hook is also bypassable with `--no-verify` or by committing
+  through the GitHub web UI, so the string that reaches permanent history was the only one
+  nothing checked. Its accepted types are deliberately the exact set
+  `cz_conventional_commits` accepts (`build`, `bump`, `chore`, `ci`, `docs`, `feat`, `fix`,
+  `perf`, `refactor`, `revert`, `style`, `test`), so a message the hook accepts is always a
+  valid PR title. Documented in the generated `CLAUDE.md`, `AGENTS.md` and `CONTRIBUTING.md`,
+  whose CI/CD tables and commit-convention sections previously described the hook as the
+  only enforcement.
 - **Coverage now measures `deployment/`, not just `agent/`.** `pyproject.toml` scoped
   `--cov=agent`, so the reported 96% said nothing about the deployment path — and
   `deploy.py`, which pickles the agent and ships it to Agent Engine, had **zero tests

@@ -206,9 +206,12 @@ make pre-commit   # runs all hooks
 - If detect-secrets fails: make sure you have not committed credentials
 - **Never use `git commit --no-verify`** — this bypasses safety checks
 
-## Conventional commits (enforced by commitizen hook)
+## Conventional commits (enforced twice — locally and in CI)
 
 Format: `type(scope): description`
+
+Allowed types: `build`, `bump`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+`revert`, `style`, `test`.
 
 ```text
 feat(agent): add calendar lookup tool
@@ -219,7 +222,15 @@ test(evals): add promptfoo test for jailbreak via roleplay
 refactor(deployment): simplify config dataclass
 ```
 
-The commit-msg hook will reject non-conforming messages.
+Two things enforce this, and both matter:
+
+- The **`commit-msg` hook** (commitizen) rejects non-conforming *commit messages* locally.
+- **`lint-pr.yml`** checks the **PR title** in CI. This is not redundant: a squash merge
+  discards the branch's commit messages and uses the PR title as the subject of the commit
+  that lands on `main` — the one `cz bump` reads to build `CHANGELOG.md`. The local hook is
+  also bypassable with `--no-verify` or by committing through the GitHub web UI.
+
+Both accept the same set of types, so a message the hook accepts is always a valid PR title.
 
 ## CHANGELOG (update for every user-facing change)
 
@@ -326,7 +337,8 @@ Alert.
 
 | Workflow | Trigger | What it checks |
 |---|---|---|
-| `ci.yml` | push + PR | lint, format, typecheck, unit tests |
+| `ci.yml` | push + PR | lint, format, typecheck, unit tests, combined-suite coverage |
+| `lint-pr.yml` | PR opened/edited | PR title is a valid conventional commit |
 | `security.yml` | push to main + weekly | CodeQL, pip-audit CVEs, secret scan |
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
 | `deploy.yml` | push to main | deploys to Agent Engine prod, then runs a standalone health check |
