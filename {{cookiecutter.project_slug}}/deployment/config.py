@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def _project_name() -> str:
     """Read the project name from pyproject.toml so derived names stay in sync."""
     pyproject = Path(__file__).parent.parent / "pyproject.toml"

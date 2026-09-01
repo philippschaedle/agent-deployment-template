@@ -1,4 +1,5 @@
 """Unit tests for agent tools — no network, no GCP credentials required."""
+
 import json
 from unittest.mock import Mock, patch
 
@@ -46,7 +47,9 @@ def test_web_search_with_api_key_set(monkeypatch):
     monkeypatch.setenv("SERPAPI_API_KEY", "test-key-123")
     with patch("agent.tools.example_tools._serpapi_search") as mock_search:
         mock_search.return_value = [
-            SearchResult(title="Mocked Result", url="https://example.com", snippet="Mock snippet")
+            SearchResult(
+                title="Mocked Result", url="https://example.com", snippet="Mock snippet"
+            )
         ]
         results = web_search("test query")
         mock_search.assert_called_once_with("test query", "test-key-123")

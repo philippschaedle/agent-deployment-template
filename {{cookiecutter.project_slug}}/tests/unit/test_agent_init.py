@@ -1,4 +1,5 @@
 """Unit tests for agent module initialization."""
+
 import pytest
 
 from agent import load_prompt

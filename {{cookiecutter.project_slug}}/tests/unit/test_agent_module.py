@@ -6,6 +6,7 @@ def test_agent_module_imports_successfully():
     # This test ensures that agent.py can be imported
     # which tests all the module-level code
     from agent import agent  # noqa: F401
+
     assert True  # If we get here, the import succeeded
 
 

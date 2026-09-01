@@ -11,6 +11,15 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Fixed
 
+- **Six template source files were not `ruff format` clean, so `ci.yml`'s
+  `lint-format-typecheck` job failed on the first PR of every generated project.** The
+  generated `ci.yml` runs `uv run ruff format --check .`, but nothing in this template repo
+  ever format-checked the generated tree: `make validate` ran only `ruff check`, and ruff
+  cannot be pointed at the template sources in place because
+  `{{cookiecutter.project_slug}}/pyproject.toml` has unrendered Jinja in `requires-python`
+  (`Failed to parse version: >={{cookiecutter.python_version}}`). Reformatted
+  `deployment/config.py`, `tests/integration/test_agent_runner.py`, and four
+  `tests/unit/test_*.py` files.
 - Generated `ci.yml`'s `test` and `integration-test` jobs each ran `pytest` against only
   `tests/unit` or only `tests/integration`, but both were still held to the project-wide
   `--cov-fail-under=75` bar (`pyproject.toml`) — a bar neither suite was ever meant to

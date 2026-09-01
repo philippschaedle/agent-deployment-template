@@ -31,11 +31,13 @@ async def test_pipeline_skips_intermediate_events(
     patch_runner, make_text_event, make_intermediate_event
 ):
     """Pipeline ignores non-final events and returns only the final text."""
-    patch_runner([
-        make_intermediate_event(),
-        make_intermediate_event(),
-        make_text_event("The current date is 2026-06-25."),
-    ])
+    patch_runner(
+        [
+            make_intermediate_event(),
+            make_intermediate_event(),
+            make_text_event("The current date is 2026-06-25."),
+        ]
+    )
 
     from tests.evals.provider import _run_agent
 
@@ -67,10 +69,12 @@ async def test_pipeline_returns_empty_string_with_only_intermediate_events(
 
 async def test_pipeline_returns_first_final_event_text(patch_runner, make_text_event):
     """Pipeline stops at the first final-response event (early return)."""
-    patch_runner([
-        make_text_event("First response."),
-        make_text_event("Second response."),
-    ])
+    patch_runner(
+        [
+            make_text_event("First response."),
+            make_text_event("Second response."),
+        ]
+    )
 
     from tests.evals.provider import _run_agent
 
@@ -105,11 +109,13 @@ async def test_pipeline_handles_tool_call_followed_by_final_response(
       2. Tool runs and returns result → intermediate event
       3. Model generates final text   → final-response event
     """
-    patch_runner([
-        make_intermediate_event(),  # tool call requested
-        make_intermediate_event(),  # tool result returned
-        make_text_event("The current time is 12:34 UTC."),
-    ])
+    patch_runner(
+        [
+            make_intermediate_event(),  # tool call requested
+            make_intermediate_event(),  # tool result returned
+            make_text_event("The current time is 12:34 UTC."),
+        ]
+    )
 
     from tests.evals.provider import _run_agent
 
