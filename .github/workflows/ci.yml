@@ -41,6 +41,11 @@ jobs:
       - name: Lint markdown
         uses: DavidAnson/markdownlint-cli2-action@v16
         with:
-          globs: "**/*.md"
+          # `uv sync` above creates .venv, which holds third-party markdown this
+          # repo does not own (pyright's typeshed README, typer's SKILL.md).
+          # markdownlint-cli2 does not read .gitignore, so exclude it explicitly —
+          # without this the job fails on dependencies rather than on our docs.
+          globs: |
+            **/*.md
+            !.venv/**
           config: .markdownlint.json
-        continue-on-error: true
