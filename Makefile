@@ -37,6 +37,7 @@ validate:
 	@echo "Running lint and tests in generated project..."
 	cd /tmp/cc-validate/test-agent && uv sync --frozen
 	cd /tmp/cc-validate/test-agent && uv run ruff check .
+	cd /tmp/cc-validate/test-agent && uv run ruff format --check .
 	cd /tmp/cc-validate/test-agent && uv run pytest tests/unit -v --no-cov
 	cd /tmp/cc-validate/test-agent && uv run pytest tests/integration -v --tb=short --no-cov
 	@echo ""

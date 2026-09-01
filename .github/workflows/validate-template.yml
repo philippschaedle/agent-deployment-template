@@ -8,15 +8,40 @@ on:
 
 jobs:
   generate-and-test:
-    name: Generate project and run tests
+    # Cookiecutter choice variables are a combinatorial surface, and generating only the
+    # defaults hides breakage in the other values: python_version=3.12 once produced a
+    # project that failed its own `ruff check` (UP047 wants PEP 695 generics, which the
+    # 3.11-compatible template source cannot use). One variant per axis that changes the
+    # *structure* of what is generated — model_provider is deliberately absent because it
+    # only seeds .env.example's MODEL_PROVIDER default: it gates no Jinja conditional and
+    # changes no file, so it cannot break generation. resolve_model's per-provider branches
+    # are covered by tests/unit/test_config.py, which is the only thing that can cover them
+    # (they are selected at runtime from the env var, not at generation time).
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Default variant
+            python_version: "3.11"
+            extra_args: ""
+          - name: python_version=3.12
+            python_version: "3.12"
+            extra_args: python_version=3.12
+          - name: license=Apache-2.0
+            python_version: "3.11"
+            extra_args: open_source_license=Apache-2.0
+          - name: license=Proprietary
+            python_version: "3.11"
+            extra_args: open_source_license=Proprietary
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python_version }}
 
       - uses: astral-sh/setup-uv@v4
         with:
@@ -33,7 +58,8 @@ jobs:
             --output-dir /tmp/cc-test \
             project_name="Test Agent" \
             author_email="test@example.com" \
-            gcp_project_id="test-project-123"
+            gcp_project_id="test-project-123" \
+            ${{ matrix.extra_args }}
 
       - name: List generated project
         run: ls -la /tmp/cc-test/test-agent/
@@ -46,6 +72,15 @@ jobs:
         run: uv run ruff check .
         working-directory: /tmp/cc-test/test-agent
 
+      # The generated project's own ci.yml runs `ruff format --check .`, so template
+      # sources that are not ruff-format clean fail the very first PR of every project
+      # generated from this template. Ruff cannot check the template tree in place —
+      # {{cookiecutter.project_slug}}/pyproject.toml has unrendered Jinja in
+      # requires-python — so the check has to happen here, against the rendered project.
+      - name: Format check generated project
+        run: uv run ruff format --check .
+        working-directory: /tmp/cc-test/test-agent
+
       - name: Type check generated project
         run: uv run pyright
         working-directory: /tmp/cc-test/test-agent
@@ -55,3 +90,11 @@ jobs:
         working-directory: /tmp/cc-test/test-agent
         env:
           PYTHONPATH: /tmp/cc-test/test-agent
+
+      # A freshly generated project must pass its own hook set untouched. Catches the
+      # class of defect the individual steps above miss — end-of-file-fixer rewriting a
+      # generated file, detect-secrets firing on generated metadata — each of which makes
+      # a new project fail `make pre-commit` before its author has written a line of code.
+      - name: Run generated project's pre-commit hooks
+        run: uv run pre-commit run --all-files
+        working-directory: /tmp/cc-test/test-agent

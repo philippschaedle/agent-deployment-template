@@ -137,6 +137,12 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   (locking the code to what `README.md`/`CLAUDE.md` document) and empty-string
   `AGENT_ENGINE_RESOURCE_NAME` handling. `LiteLlm(...)` construction needs no API key and
   makes no network call, so every case is offline and deterministic.
+- `validate-template.yml` now generates four cookiecutter variants instead of only the
+  defaults — default, `python_version=3.12`, `open_source_license=Apache-2.0`, and
+  `open_source_license=Proprietary` — and, for each, additionally runs `ruff format
+  --check .` and the generated project's full `pre-commit` hook set. `make validate` gains
+  the same format check. Every generated-project fix in this release was a defect that
+  only the defaults-only validation had allowed through.
 - Rollback support for Agent Engine deployments: `deploy.yml` accepts an optional `ref`
   `workflow_dispatch` input (defaults to the triggering ref), and generated projects get a
   `make rollback REF=<tag> [ENV=prod|dev]` target that redeploys a previous git ref against the
