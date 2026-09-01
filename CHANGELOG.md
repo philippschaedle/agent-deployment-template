@@ -65,6 +65,9 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   fail immediately. Now commits (`chore: initial commit from agent-deployment-template`)
   right after staging, before pre-commit hooks are installed, so the initial commit isn't
   blocked by autofixing hooks (ruff/markdownlint) rewriting files mid-commit.
+- Generated `README.md`/`CLAUDE.md` documented `GOOGLE_CLOUD_LOCATION`'s default as
+  `us-central1`; the actual default in `deployment/config.py` and `setup_gcp.sh` has
+  always been `europe-west1`. Docs now match the code.
 
 ### Added
 

@@ -185,7 +185,7 @@ Set `MODEL_PROVIDER` in `.env`:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GOOGLE_CLOUD_PROJECT` | Deploy only | — | GCP project ID |
-| `GOOGLE_CLOUD_LOCATION` | Deploy only | `us-central1` | Vertex AI region |
+| `GOOGLE_CLOUD_LOCATION` | Deploy only | `europe-west1` | Vertex AI region |
 | `GCS_STAGING_BUCKET` | Deploy only | — | GCS bucket for Agent Engine artefacts |
 | `AGENT_ENGINE_RESOURCE_NAME` | No | — | Existing resource to update (omit = create new) |
 | `MODEL_PROVIDER` | No | `google` | Provider selection |

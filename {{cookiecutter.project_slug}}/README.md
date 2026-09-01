@@ -95,7 +95,7 @@ exactly what to configure and where `setup-gcp`'s output goes.
 | Variable | Required | Description |
 |---|---|---|
 | `GOOGLE_CLOUD_PROJECT` | Deploy | GCP project ID |
-| `GOOGLE_CLOUD_LOCATION` | Deploy | Vertex AI region (default: `us-central1`) |
+| `GOOGLE_CLOUD_LOCATION` | Deploy | Vertex AI region (default: `europe-west1`) |
 | `GCS_STAGING_BUCKET` | Deploy | GCS bucket for Agent Engine artefacts |
 | `AGENT_ENGINE_RESOURCE_NAME` | No | Existing resource to update (omit = create new) |
 | `MODEL_PROVIDER` | No | `google` \| `anthropic` \| `openai` \| `litellm` |
