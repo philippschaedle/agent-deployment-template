@@ -17,6 +17,13 @@ repos:
       - id: trailing-whitespace
       - id: check-merge-conflict
 
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.22.1
+    hooks:
+      - id: markdownlint-cli2
+        args: [--fix, --config, .markdownlint.json]
+        exclude: CHANGELOG\.md
+
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.28.0
     hooks:

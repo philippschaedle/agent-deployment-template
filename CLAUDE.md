@@ -11,7 +11,7 @@ This is a **cookiecutter template** repository. Running `cookiecutter .` (or `co
 Prerequisites: Python 3.11+, `uv`, Node.js 20+, `cookiecutter`
 
 ```bash
-make install    # install dev dependencies for the template repo itself
+make install    # install dev dependencies + pre-commit/commit-msg git hooks
 make validate   # generate a test project and verify it compiles + tests pass
 ```
 
@@ -50,7 +50,7 @@ Ruff autofixes most lint issues: run `make format` then `make lint` to clear the
 
 ## Conventional commits (required — enforced by commitizen hook)
 
-```
+```text
 feat(template): add new cookiecutter variable for agent name
 fix(hooks): correct slug validation regex
 chore(ci): update ruff version
@@ -100,8 +100,8 @@ before running it.
 ## Make targets
 
 | Target | Description |
-|---|---|
-| `make install` | Install dev dependencies with uv |
+| --- | --- |
+| `make install` | Install dev dependencies with uv, then install the pre-commit and commit-msg git hooks |
 | `make lint` | Ruff lint check (excludes generated template dir) |
 | `make format` | Ruff format |
 | `make typecheck` | Pyright on hooks/ |
@@ -111,14 +111,14 @@ before running it.
 ## GitHub Actions (template repo)
 
 | Workflow | Trigger | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `ci.yml` | push + PR | Lints hooks/, validates markdown, checks cookiecutter.json |
 | `validate-template.yml` | push + PR | Generates a project via cookiecutter and runs its unit tests |
 | `lint-pr.yml` | PR open/edit | Checks PR title is a valid conventional commit |
 
 ## Repository structure
 
-```
+```text
 agent-deployment-template/
 ├── cookiecutter.json               ← variables collected from user at generation time
 ├── hooks/

@@ -103,7 +103,7 @@ flowchart TD
 ## Cookiecutter variables
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `project_name` | `My ADK Agent` | Human-readable project name |
 | `project_slug` | auto from name | Directory name and Python package name |
 | `project_description` | — | One-line description |

@@ -4,7 +4,7 @@ help:
 	@echo ""
 	@echo "agent-deployment-template — available targets"
 	@echo ""
-	@echo "  install     Install dev dependencies for the template repo"
+	@echo "  install     Install dev dependencies and git hooks for the template repo"
 	@echo "  lint        Lint hooks/ with ruff"
 	@echo "  format      Format hooks/ with ruff"
 	@echo "  typecheck   Type-check hooks/ with pyright"
@@ -14,6 +14,8 @@ help:
 
 install:
 	uv sync
+	uv run pre-commit install
+	uv run pre-commit install --hook-type commit-msg
 
 lint:
 	uv run ruff check hooks/

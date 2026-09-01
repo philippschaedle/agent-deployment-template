@@ -12,15 +12,15 @@ A **cookiecutter template** that generates production-ready [Google ADK](https:/
 
 ```bash
 # Prerequisites: Python 3.11+, uv, cookiecutter
-make install    # install dev dependencies (ruff, pyright, commitizen)
+make install    # install dev dependencies (ruff, pyright, commitizen) + git hooks
 make validate   # generate a test project and verify it compiles + tests pass
 ```
 
 ## Make targets
 
 | Target | Description |
-|---|---|
-| `make install` | Install dev dependencies with uv |
+| --- | --- |
+| `make install` | Install dev dependencies with uv, then install git hooks |
 | `make lint` | Ruff lint check on hooks/ |
 | `make format` | Ruff format on hooks/ |
 | `make typecheck` | Pyright on hooks/ |
@@ -29,7 +29,7 @@ make validate   # generate a test project and verify it compiles + tests pass
 
 ## Repository structure
 
-```
+```text
 cookiecutter.json               variables collected at generation time
 hooks/
   pre_gen_project.py            validates inputs before generation
@@ -53,15 +53,18 @@ AGENTS.md                       this file
 ## Working on this template
 
 ### Adding a cookiecutter variable
+
 1. Add to `cookiecutter.json`
 2. Reference in template files as `{{cookiecutter.your_variable}}`
 3. Update the README variables table
 4. Run `make validate`
 
 ### Testing changes
+
 Always run `make validate` before committing — it generates a real project and verifies it passes lint and unit tests.
 
 ### Jinja2 / GitHub Actions conflict
+
 GitHub Actions uses `${{ }}` syntax which conflicts with Jinja2. Any `${{ }}` expression inside `{{cookiecutter.project_slug}}/.github/workflows/` must be wrapped with `{% raw %}...{% endraw %}`.
 
 ## Code conventions
@@ -75,7 +78,7 @@ GitHub Actions uses `${{ }}` syntax which conflicts with Jinja2. Any `${{ }}` ex
 ## GitHub Actions (this repo)
 
 | Workflow | Trigger | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `ci.yml` | push + PR | Lints hooks/, validates cookiecutter.json |
 | `validate-template.yml` | push + PR | Generates project, runs its lint + unit tests |
 | `lint-pr.yml` | PR open/edit | Enforces conventional commit PR title |
