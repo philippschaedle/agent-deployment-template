@@ -33,6 +33,14 @@ CRUFT_CONTEXT = {
     "_template": TEMPLATE_URL,
 }
 
+# `cruft create` rewrites .cruft.json itself after this hook has already committed it,
+# appending _commit to the context (see cruft's generate_cookiecutter_context). Without
+# the same key here, that rewrite differs from what we committed and every project made
+# the documented way starts with a dirty working tree. Only cruft supplies _commit, so
+# plain-cookiecutter runs correctly omit it.
+if TEMPLATE_COMMIT_HINT:
+    CRUFT_CONTEXT["_commit"] = TEMPLATE_COMMIT_HINT
+
 
 def run(cmd: str, check: bool = True) -> int:
     result = subprocess.run(cmd, shell=True, cwd=PROJECT_DIR)
@@ -103,7 +111,9 @@ def write_cruft_json() -> None:
         "directory": None,
     }
     cruft_json = PROJECT_DIR / ".cruft.json"
-    cruft_json.write_text(json.dumps(cruft_config, indent=2) + "\n")
+    # Mirrors cruft's own json_dumps: ensure_ascii=False matters for a non-ASCII
+    # author name, which would otherwise be escaped here and unescaped by cruft.
+    cruft_json.write_text(json.dumps(cruft_config, ensure_ascii=False, indent=2) + "\n")
 
 
 # Remove license file for proprietary projects

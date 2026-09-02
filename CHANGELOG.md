@@ -11,6 +11,17 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Fixed
 
+- **`cruft create` left every generated project with a dirty working tree.**
+  `hooks/post_gen_project.py` writes `.cruft.json` and commits it, and then cruft rewrites
+  the same file after the hook returns — so the documented `cruft create gh:org/repo` flow
+  produced a project whose first `git status` showed a modification its author never made,
+  ready to be swept into their next commit. Plain `cookiecutter` never showed it, because
+  cruft is not involved there, which is why earlier testing missed it. Two differences had
+  to be closed, both verified necessary by byte-comparing the hook's output against
+  cruft's own `json_dumps` for the same answers: cruft appends `_commit` to the context
+  (added here only when cruft supplies it, so plain-cookiecutter output is unchanged), and
+  cruft passes `ensure_ascii=False`, so a non-ASCII author name such as `Schädle` was
+  written escaped by the hook and unescaped by cruft. The two files are now byte-identical.
 - **`security.yml`'s CodeQL job failed permanently on private repositories.** Code scanning
   is free on public repos but needs GitHub Advanced Security on private ones, and the job
   had no guard — so every push to `main` in a private generated project produced a red
