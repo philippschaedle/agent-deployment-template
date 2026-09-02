@@ -11,6 +11,19 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Fixed
 
+- **`security.yml`'s CodeQL job failed permanently on private repositories.** Code scanning
+  is free on public repos but needs GitHub Advanced Security on private ones, and the job
+  had no guard — so every push to `main` in a private generated project produced a red
+  `CodeQL Analysis` check forever, which is worse than no job at all because it teaches a
+  team to ignore red CI. Confirmed on a real private repo:
+  `Code scanning is not enabled for this repository`. Testing visibility would have been
+  the wrong fix — private + Advanced Security should still run CodeQL. A small
+  `code-scanning-available` job now probes `GET /code-scanning/alerts` and gates CodeQL on
+  the result: the API returns 403 when code scanning is unavailable and 404 (`no analysis
+  found`) or 200 when it is, so only a 403 disables it. Verified against both real cases —
+  403 on a private repo without GHAS, 404 on a public one. CodeQL is then *skipped* rather
+  than failed, and the step summary explains why; `Dependency CVE Audit` and `Secret Scan`
+  are unaffected and still run everywhere.
 - **Generation failed outright on any machine without a configured git identity** —
   `hooks/post_gen_project.py`'s `git commit` exited 128 with `fatal: empty ident name`, and
   because cookiecutter treats a failing post-gen hook as fatal, it then deleted everything

@@ -7,9 +7,45 @@ on:
     - cron: "0 9 * * 1" # Every Monday 09:00 UTC
 
 jobs:
+  # CodeQL needs code scanning enabled, which is free on public repositories but requires
+  # GitHub Advanced Security on private ones. Without this probe the CodeQL job below fails
+  # on every push for a private repo without GHAS — permanently red, which trains everyone
+  # to ignore red CI. Visibility alone is the wrong test: private + GHAS should still run.
+  #
+  # The API distinguishes the cases exactly. GET /code-scanning/alerts returns 403 "Code
+  # scanning is not enabled for this repository" when it is unavailable, and 404 "no
+  # analysis found" (or 200) when it is available but has nothing yet. So only 403 disables
+  # CodeQL. security-events: read is granted explicitly below, so a 403 cannot mean "the
+  # token lacks the scope".
+  code-scanning-available:
+    name: Code scanning availability
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: read
+    outputs:
+      enabled: "{% raw %}${{ steps.probe.outputs.enabled }}{% endraw %}"
+    steps:
+      - id: probe
+        run: |
+          http_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/{% raw %}${{ github.repository }}{% endraw %}/code-scanning/alerts")
+          if [ "$http_status" = "403" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "CodeQL skipped: code scanning is not enabled for this repository." \
+              "It is free on public repositories; private ones need GitHub Advanced" \
+              "Security. The dependency audit and secret scan below still run." \
+              >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
   codeql:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
+    needs: code-scanning-available
+    if: needs.code-scanning-available.outputs.enabled == 'true'
     permissions:
       security-events: write
       actions: read
