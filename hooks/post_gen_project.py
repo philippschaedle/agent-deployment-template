@@ -7,6 +7,8 @@ from pathlib import Path
 PROJECT_DIR = Path(os.path.realpath(os.path.curdir))
 LICENSE_CHOICE = "{{ cookiecutter.open_source_license }}"
 PROJECT_SLUG = "{{ cookiecutter.project_slug }}"
+AUTHOR_NAME = "{{ cookiecutter.author_name }}"
+AUTHOR_EMAIL = "{{ cookiecutter.author_email }}"
 
 # Plain `cookiecutter` injects _template/_repo_dir/_checkout into the context.
 # `cruft create`/`cruft update` instead inject _template/_commit and omit the
@@ -47,6 +49,32 @@ def remove_file(relative_path: str) -> None:
 
 def uv_available() -> bool:
     return subprocess.run("which uv", shell=True, capture_output=True).returncode == 0
+
+
+def ensure_git_identity() -> None:
+    """Give the new repo a committer identity if the machine has none.
+
+    `git commit` exits 128 with "empty ident name" wherever no identity is
+    configured and git cannot guess one from the OS user — CI runners,
+    containers, freshly-imaged laptops. That aborted generation outright and
+    left no project behind at all, since cookiecutter treats a failing
+    post-gen hook as fatal.
+
+    An identity already configured (global or system) is left alone; the
+    fallback is written to the new repo's local config only, so nothing
+    outside it is touched. Argument lists rather than a shell string, because
+    an author name may contain quotes.
+    """
+    for key, fallback in (("user.name", AUTHOR_NAME), ("user.email", AUTHOR_EMAIL)):
+        existing = subprocess.run(
+            ["git", "config", "--get", key],
+            cwd=PROJECT_DIR,
+            capture_output=True,
+            text=True,
+        )
+        if existing.returncode == 0 and existing.stdout.strip():
+            continue
+        subprocess.run(["git", "config", key, fallback], cwd=PROJECT_DIR, check=False)
 
 
 def get_template_commit() -> str:
@@ -108,7 +136,17 @@ else:
 run("git add -A")
 # Commit before installing pre-commit hooks below, so this initial commit isn't subject
 # to hook enforcement (autofixes from ruff/markdownlint would otherwise block it).
-run('git commit -m "chore: initial commit from agent-deployment-template"')
+ensure_git_identity()
+INITIAL_COMMIT_MSG = "chore: initial commit from agent-deployment-template"
+# Non-fatal on purpose: a project that generated but did not commit is
+# recoverable in one command, whereas a failing hook makes cookiecutter delete
+# everything it just produced.
+if run(f'git commit -m "{INITIAL_COMMIT_MSG}"', check=False):
+    print(
+        "\nWARNING: the initial commit failed. The project is generated and\n"
+        "every file is staged — finish it with:\n"
+        f'  git -C {PROJECT_SLUG} commit -m "{INITIAL_COMMIT_MSG}"'
+    )
 
 if uv_available():
     print("\n> Installing pre-commit hooks...")

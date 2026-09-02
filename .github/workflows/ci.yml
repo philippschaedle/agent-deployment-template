@@ -38,14 +38,14 @@ jobs:
       - name: Validate cookiecutter.json
         run: python3 -c "import json; json.load(open('cookiecutter.json')); print('cookiecutter.json is valid JSON')"
 
+      # Run the pinned pre-commit hook rather than markdownlint-cli2-action, so CI and
+      # `make pre-commit` cannot disagree. They did: the action at @v16 bundles
+      # markdownlint-cli2 v0.13.0 while .pre-commit-config.yaml pins v0.22.1, and v0.13.0
+      # could not resolve `"extends": "markdownlint/style/relaxed"` in the generated
+      # project's own .markdownlint.json — it failed with ENOENT on a path built from the
+      # literal {{cookiecutter.project_slug}} directory name. One pinned version, one
+      # source of truth. This also drops the old !.venv/** glob workaround: pre-commit only
+      # ever looks at git-tracked files, so third-party markdown under .venv is excluded by
+      # construction rather than by an exclusion someone has to remember to maintain.
       - name: Lint markdown
-        uses: DavidAnson/markdownlint-cli2-action@v16
-        with:
-          # `uv sync` above creates .venv, which holds third-party markdown this
-          # repo does not own (pyright's typeshed README, typer's SKILL.md).
-          # markdownlint-cli2 does not read .gitignore, so exclude it explicitly —
-          # without this the job fails on dependencies rather than on our docs.
-          globs: |
-            **/*.md
-            !.venv/**
-          config: .markdownlint.json
+        run: uv run pre-commit run markdownlint-cli2 --all-files --show-diff-on-failure

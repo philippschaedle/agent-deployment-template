@@ -14,13 +14,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Exactly the set commitizen's cz_conventional_commits accepts, matching the
+          # commit-msg hook configured in pyproject.toml. A narrower list here would reject
+          # a PR title that the hook had already accepted as a commit message — a confusing
+          # place for the two to disagree. Kept in step with the same list in
+          # {{cookiecutter.project_slug}}/.github/workflows/lint-pr.yml.
           types: |
+            build
+            bump
+            chore
+            ci
+            docs
             feat
             fix
-            chore
-            docs
-            test
-            refactor
             perf
-            ci
+            refactor
+            revert
+            style
+            test
           requireScope: false

@@ -11,6 +11,19 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ### Fixed
 
+- **Generation failed outright on any machine without a configured git identity** —
+  `hooks/post_gen_project.py`'s `git commit` exited 128 with `fatal: empty ident name`, and
+  because cookiecutter treats a failing post-gen hook as fatal, it then deleted everything
+  it had just produced: no project at all, not merely an uncommitted one. This hit CI
+  runners, containers and freshly-imaged laptops — anywhere git cannot guess an identity
+  from the OS user — and was introduced by the initial-commit fix in the previous release.
+  It went unnoticed because a developer machine with a global `user.name` never reproduces
+  it. Found on the first real CI run of `validate-template.yml`, where all four matrix
+  variants failed identically. The hook now falls back to the cookiecutter `author_name` /
+  `author_email` written to the **new repo's local config only** (an existing global or
+  system identity is left untouched), and the commit itself is no longer fatal — a
+  generated-but-uncommitted project is recoverable in one command, which the warning now
+  prints.
 - **Generating with `python_version=3.12` produced a project that failed its own
   `ruff check` on the very first CI run.** With `target-version = "py312"`, ruff's `UP047`
   fires on `agent/observability.py`'s `def instrument(func: F) -> F`, demanding PEP 695
