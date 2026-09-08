@@ -23,7 +23,7 @@ help:
 	@echo "  rollback     Redeploy a previous git ref: make rollback REF=<tag> [ENV=prod|dev]"
 	@echo "  health-check Run a standalone smoke test against the deployed Agent Engine resource"
 	@echo "  logs         Stream Cloud Logging output for this agent"
-	@echo "  traces       Open Cloud Trace in browser"
+	@echo "  traces       List this agent's Cloud Trace spans"
 	@echo "  setup-gcp    One-time GCP bootstrap: make setup-gcp [ENV=dev|prod] (default: prod)"
 	@echo "  setup-monitoring  One-time Cloud Monitoring dashboard + alert policy bootstrap"
 	@echo "  pre-commit   Run all pre-commit hooks on all files"
@@ -84,7 +84,7 @@ logs:
 	bash deployment/scripts/read_logs.sh
 
 traces:
-	bash deployment/scripts/read_traces.sh
+	uv run python deployment/scripts/read_traces.py
 
 setup-gcp:
 	bash deployment/scripts/setup_gcp.sh $(or $(ENV),prod)

@@ -147,3 +147,80 @@ def test_deploy_env_argument_is_informational_only(deploy_env, deps):
     deploy("prod")
 
     assert deps.init.call_args.kwargs == dev_kwargs
+
+
+def test_deploy_passes_runtime_service_account_when_set(deploy_env, deps, monkeypatch):
+    """Without this, Vertex runs the agent as the shared Reasoning Engine Service
+    Agent and every IAM grant setup_gcp.sh makes goes unused at runtime."""
+    monkeypatch.setenv("AGENT_ENGINE_SERVICE_ACCOUNT", "sa@p.iam.gserviceaccount.com")
+
+    deploy("dev")
+
+    assert (
+        deps.create.call_args.kwargs["service_account"]
+        == "sa@p.iam.gserviceaccount.com"
+    )
+
+
+def test_deploy_uses_the_derived_service_account_when_none_is_configured(
+    deploy_env, deps, monkeypatch
+):
+    """Never absent: omitting the kwarg is what silently put agents on the shared
+    Reasoning Engine Service Agent, so the derived SA is sent instead."""
+    monkeypatch.delenv("AGENT_ENGINE_SERVICE_ACCOUNT", raising=False)
+
+    deploy("dev")
+
+    assert (
+        deps.create.call_args.kwargs["service_account"]
+        == "agent-engine-sa@test-project-123.iam.gserviceaccount.com"
+    )
+
+
+def test_deploy_passes_service_account_on_update_too(deploy_env, deps, monkeypatch):
+    """An existing resource must be moved onto the runtime SA, not just new ones."""
+    monkeypatch.setenv("AGENT_ENGINE_RESOURCE_NAME", RESOURCE)
+    monkeypatch.setenv("AGENT_ENGINE_SERVICE_ACCOUNT", "sa@p.iam.gserviceaccount.com")
+
+    deploy("prod")
+
+    update_kwargs = deps.get.return_value.update.call_args.kwargs
+    assert update_kwargs["service_account"] == "sa@p.iam.gserviceaccount.com"
+
+
+def test_deploy_enables_observability_on_the_deployed_resource(deploy_env, deps):
+    """The trace exporter defaults to off, so the deploy is what switches it on, and
+    it needs the project passed explicitly to export anything at all."""
+    deploy("dev")
+
+    assert deps.create.call_args.kwargs["env_vars"] == {
+        "CLOUD_TRACE_ENABLED": "true",
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": "test-project-123",
+    }
+
+
+def test_deploy_enables_observability_on_update_too(deploy_env, deps, monkeypatch):
+    monkeypatch.setenv("AGENT_ENGINE_RESOURCE_NAME", RESOURCE)
+
+    deploy("prod")
+
+    assert deps.get.return_value.update.call_args.kwargs["env_vars"] == {
+        "CLOUD_TRACE_ENABLED": "true",
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": "test-project-123",
+    }
+
+
+def test_deploy_requirements_match_pyproject_dependencies(deploy_env, deps):
+    """The remote container installs `requirements`, not pyproject.toml. A package
+    imported by agent/ but missing from this list is an ImportError in production,
+    which is exactly how the observability imports could regress."""
+    import tomllib
+    from pathlib import Path
+
+    pyproject = Path(__file__).parent.parent.parent / "pyproject.toml"
+    with open(pyproject, "rb") as handle:
+        declared = tomllib.load(handle)["project"]["dependencies"]
+
+    deploy("dev")
+
+    assert deps.create.call_args.kwargs["requirements"] == declared

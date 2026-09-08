@@ -1,36 +1,56 @@
-"""Structured observability: JSON logging, call instrumentation, and PII redaction.
+"""Structured observability: JSON logging, tracing, call instrumentation, PII redaction.
 
 `instrument` wraps `agent/tools/*` functions -- the boundary this project actually
 controls. Agent Engine's managed runtime drives the ADK `Runner` internally, so a
 decorator on `Runner.run_async` would never fire in production; tool calls are invoked
 by our own code regardless of where the agent runs, so that's the choke point used here.
 
-Cloud Logging parses a JSON-formatted stdout line into `jsonPayload` automatically, and
-promotes reserved top-level keys -- `severity` here -- out of `jsonPayload` into the
-LogEntry's own fields, making them filterable in Logs Explorer (e.g. `severity=ERROR`).
-No separate log sink is needed: Agent Engine forwards container stdout/stderr to Cloud
-Logging on its own, the same way Cloud Run does.
+Destinations
+------------
+**Logs go to stdout, and that is sufficient.** Agent Engine forwards container
+stdout/stderr to Cloud Logging under the log names
+`aiplatform.googleapis.com/reasoning_engine_stdout` and `..._stderr` -- verified against
+a live deployment, where the JSON lines below arrived intact with no client library
+involved. `read_logs.sh` reads exactly those.
+
+A previous revision of this file also attached `CloudLoggingHandler`, on the belief that
+stdout was *not* forwarded. That belief came from a deployment where no application logs
+appeared at all -- which turned out to be a disabled `_Default` log sink in the GCP
+project, discarding every non-audit entry regardless of how it was written. With the sink
+enabled, every event arrived twice: once via stdout and once via the API handler. The
+handler was removed as redundant. If logs ever appear to vanish again, check
+`gcloud logging sinks describe _Default` before changing anything here.
+
+Traces are different: nothing forwards them, so `CLOUD_TRACE_ENABLED` configures an
+OpenTelemetry exporter that writes to Cloud Trace directly, and every `@instrument`ed
+call becomes a span. It is off by default so a local `make dev` never writes to a real
+project; `deployment/deploy.py` turns it on for the deployed agent, and passes
+`OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` alongside it -- the exporter otherwise falls back to
+`google.auth.default()`, which inside the Agent Engine container resolves no project and
+fails every export with `INVALID_ARGUMENT: Invalid project id in name!`.
+
+Telemetry must never break a tool call: if a library is missing or credentials cannot be
+resolved, the failure is reported once on stderr and the tool runs on.
 """
 
 from __future__ import annotations
 
+import atexit
 import functools
 import inspect
 import json
 import logging
+import os
 import re
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import Any, TypeVar
 
-logger = logging.getLogger("{{cookiecutter.project_slug}}.observability")
-if not logger.handlers:
-    _handler = logging.StreamHandler(sys.stdout)
-    _handler.setFormatter(logging.Formatter("%(message)s"))
-    logger.addHandler(_handler)
-    logger.setLevel(logging.INFO)
-    logger.propagate = False
+SERVICE_NAME = "{{cookiecutter.project_slug}}"
+
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -41,6 +61,102 @@ _PII_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED_SSN]"),
     (re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"), "[REDACTED_CARD]"),
 ]
+
+
+def _env_flag(name: str) -> bool:
+    """Read a boolean environment variable. Absent or unrecognised means off."""
+    return os.getenv(name, "").strip().lower() in _TRUTHY
+
+
+def _warn(message: str) -> None:
+    """Report a telemetry setup failure without going through `logger`.
+
+    Writes straight to stderr: this runs while `logger` is still being assembled,
+    and routing it through the logger being configured risks recursion.
+    """
+    sys.stderr.write(f"observability: {message}\n")
+
+
+def _stdout_handler() -> logging.Handler:
+    """Handler writing raw JSON lines to stdout -- the local and eval-time destination."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    return handler
+
+
+def _build_tracer() -> Any:
+    """Configure an OpenTelemetry tracer exporting to Cloud Trace, or return None.
+
+    Returns None -- disabling span emission entirely -- when `CLOUD_TRACE_ENABLED`
+    is off, the exporter is not installed, or the provider cannot be built.
+    """
+    if not _env_flag("CLOUD_TRACE_ENABLED"):
+        return None
+    try:
+        from opentelemetry import trace  # noqa: PLC0415
+        from opentelemetry.exporter.cloud_trace import (  # noqa: PLC0415
+            CloudTraceSpanExporter,
+        )
+        from opentelemetry.sdk.resources import Resource  # noqa: PLC0415
+        from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
+        from opentelemetry.sdk.trace.export import (  # noqa: PLC0415
+            BatchSpanProcessor,
+        )
+
+        provider = TracerProvider(
+            resource=Resource.create({"service.name": SERVICE_NAME})
+        )
+        provider.add_span_processor(BatchSpanProcessor(CloudTraceSpanExporter()))
+        trace.set_tracer_provider(provider)
+        # BatchSpanProcessor buffers; without this, spans from a short-lived
+        # process are dropped before they are ever exported.
+        atexit.register(provider.shutdown)
+        return trace.get_tracer(SERVICE_NAME)
+    except Exception as exc:
+        _warn(f"Cloud Trace exporter unavailable, spans disabled: {exc}")
+        return None
+
+
+logger = logging.getLogger("{{cookiecutter.project_slug}}.observability")
+if not logger.handlers:
+    logger.addHandler(_stdout_handler())
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+_TRACER = _build_tracer()
+
+
+@contextmanager
+def _span(name: str) -> Iterator[Any]:
+    """Enter a Cloud Trace span, or yield None when tracing is not configured."""
+    if _TRACER is None:
+        yield None
+        return
+    with _TRACER.start_as_current_span(name) as span:
+        yield span
+
+
+def _record_span_error(span: Any, exc: Exception) -> None:
+    """Mark a span as failed. Best-effort: telemetry must not mask the real exception."""
+    if span is None:
+        return
+    try:
+        from opentelemetry.trace import Status, StatusCode  # noqa: PLC0415
+
+        span.record_exception(exc)
+        span.set_status(Status(StatusCode.ERROR, str(exc)))
+    except Exception as span_exc:
+        _warn(f"could not record exception on span: {span_exc}")
+
+
+def _set_span_attribute(span: Any, key: str, value: Any) -> None:
+    """Set one span attribute, best-effort, for the same reason as `_record_span_error`."""
+    if span is None:
+        return
+    try:
+        span.set_attribute(key, value)
+    except Exception as span_exc:
+        _warn(f"could not set span attribute {key!r}: {span_exc}")
 
 
 def redact_pii(value: Any) -> Any:
@@ -64,12 +180,15 @@ def redact_pii(value: Any) -> Any:
 def log_event(
     event_type: str, fields: dict[str, Any] | None = None, severity: str = "INFO"
 ) -> None:
-    """Emit one structured JSON log line for Cloud Logging.
+    """Emit one structured JSON log line to every configured destination.
 
-    `severity` is a Cloud Logging reserved field (`INFO`, `ERROR`, ...), promoted out
-    of `jsonPayload` into the LogEntry itself. `agent_name` matches the filter already
-    used by `deployment/scripts/read_logs.sh`. All other field values are passed
-    through `redact_pii` first.
+    The line is a JSON object printed to stdout. Cloud Logging parses a JSON stdout
+    line into a `jsonPayload` when Agent Engine forwards it, so these fields stay
+    queryable as structured data rather than as text. `severity` is carried in the
+    payload and also drives the Python log level. Note that entries arriving this way
+    take their LogEntry severity from the payload's `severity` key, not from the log
+    level -- which is why it is written into the payload rather than left implicit.
+    All other field values are passed through `redact_pii` first.
     """
     payload: dict[str, Any] = {
         "severity": severity,
@@ -105,26 +224,33 @@ def log_model_usage(event: Any) -> None:
 
 
 def instrument(func: F) -> F:
-    """Log name, (redacted) arguments, outcome, and duration for every call.
+    """Log and trace name, (redacted) arguments, outcome, and duration for every call.
 
-    Works on sync or async callables. `functools.wraps` keeps the wrapped
-    function's name, docstring, and signature intact via `__wrapped__`, so
-    ADK's tool-schema introspection sees the original function unchanged.
+    Works on sync or async callables. Emits `<name>.start` / `.end` / `.error` log
+    events and, when tracing is configured, wraps the call in a Cloud Trace span
+    named after the function. `functools.wraps` keeps the wrapped function's name,
+    docstring, and signature intact via `__wrapped__`, so ADK's tool-schema
+    introspection sees the original function unchanged.
     """
 
     def _start(args: tuple[Any, ...], kwargs: dict[str, Any]) -> float:
         log_event(f"{func.__name__}.start", {"args": args, "kwargs": kwargs})
         return time.perf_counter()
 
-    def _end(start: float) -> None:
+    def _end(start: float, span: Any) -> None:
         duration_ms = (time.perf_counter() - start) * 1000
+        _set_span_attribute(span, "outcome", "success")
+        _set_span_attribute(span, "duration_ms", round(duration_ms, 2))
         log_event(
             f"{func.__name__}.end",
             {"duration_ms": round(duration_ms, 2), "outcome": "success"},
         )
 
-    def _error(start: float, exc: Exception) -> None:
+    def _error(start: float, exc: Exception, span: Any) -> None:
         duration_ms = (time.perf_counter() - start) * 1000
+        _set_span_attribute(span, "outcome", "error")
+        _set_span_attribute(span, "duration_ms", round(duration_ms, 2))
+        _record_span_error(span, exc)
         log_event(
             f"{func.__name__}.error",
             {"duration_ms": round(duration_ms, 2), "error": str(exc)},
@@ -135,26 +261,28 @@ def instrument(func: F) -> F:
 
         @functools.wraps(func)
         async def _async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            start = _start(args, kwargs)
-            try:
-                result = await func(*args, **kwargs)
-            except Exception as exc:
-                _error(start, exc)
-                raise
-            _end(start)
-            return result
+            with _span(func.__name__) as span:
+                start = _start(args, kwargs)
+                try:
+                    result = await func(*args, **kwargs)
+                except Exception as exc:
+                    _error(start, exc, span)
+                    raise
+                _end(start, span)
+                return result
 
         return _async_wrapper  # type: ignore[return-value]
 
     @functools.wraps(func)
     def _sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        start = _start(args, kwargs)
-        try:
-            result = func(*args, **kwargs)
-        except Exception as exc:
-            _error(start, exc)
-            raise
-        _end(start)
-        return result
+        with _span(func.__name__) as span:
+            start = _start(args, kwargs)
+            try:
+                result = func(*args, **kwargs)
+            except Exception as exc:
+                _error(start, exc, span)
+                raise
+            _end(start, span)
+            return result
 
     return _sync_wrapper  # type: ignore[return-value]

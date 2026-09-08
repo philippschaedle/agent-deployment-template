@@ -145,3 +145,78 @@ def test_from_env_uses_project_name_as_display_name(required_deploy_env):
     expected = "{{cookiecutter.project_name}}"
 
     assert DeploymentConfig.from_env().agent_display_name == expected
+
+
+def test_from_env_reads_runtime_service_account(required_deploy_env, monkeypatch):
+    """The identity the deployed agent runs as, passed through to agent_engines."""
+    monkeypatch.setenv("AGENT_ENGINE_SERVICE_ACCOUNT", "sa@p.iam.gserviceaccount.com")
+
+    config = DeploymentConfig.from_env()
+
+    assert config.service_account == "sa@p.iam.gserviceaccount.com"
+
+
+def test_from_env_derives_service_account_from_the_project(
+    required_deploy_env, monkeypatch
+):
+    """The SA name is fixed by setup_gcp.sh, so the value is fully determined by the
+    project id -- restating it in .env would only let the two drift apart."""
+    monkeypatch.delenv("AGENT_ENGINE_SERVICE_ACCOUNT", raising=False)
+
+    assert (
+        DeploymentConfig.from_env().service_account
+        == "agent-engine-sa@test-project-123.iam.gserviceaccount.com"
+    )
+
+
+def test_from_env_falls_back_to_the_derived_service_account_when_empty(
+    required_deploy_env, monkeypatch
+):
+    """An unset GitHub Actions variable arrives as "", which must not blank the SA."""
+    monkeypatch.setenv("AGENT_ENGINE_SERVICE_ACCOUNT", "")
+
+    assert (
+        DeploymentConfig.from_env().service_account
+        == "agent-engine-sa@test-project-123.iam.gserviceaccount.com"
+    )
+
+
+def test_from_env_derives_staging_bucket_from_the_project(monkeypatch):
+    """Same reasoning as the service account: setup_gcp.sh provisions
+    <project>-agent-staging, so the deploy can work that out for itself."""
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+    monkeypatch.delenv("GCS_STAGING_BUCKET", raising=False)
+
+    assert (
+        DeploymentConfig.from_env().staging_bucket
+        == "gs://test-project-123-agent-staging"
+    )
+
+
+def test_from_env_accepts_a_bucket_without_the_gs_scheme(monkeypatch):
+    """setup_gcp.sh prints the bucket bare while the docs show it with gs://, and
+    Vertex wants the full URI -- so both spellings have to work."""
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "my-own-bucket")
+
+    assert DeploymentConfig.from_env().staging_bucket == "gs://my-own-bucket"
+
+
+def test_from_env_leaves_an_explicit_gs_uri_alone(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "test-project-123")
+    monkeypatch.setenv("GCS_STAGING_BUCKET", "gs://my-own-bucket")
+
+    assert DeploymentConfig.from_env().staging_bucket == "gs://my-own-bucket"
+
+
+def test_runtime_env_vars_enable_tracing_with_an_explicit_project(required_deploy_env):
+    """Logs need nothing -- Agent Engine forwards stdout. Traces need the exporter
+    switched on *and* an explicit project: without the latter it falls back to
+    google.auth.default(), which resolves nothing in the container and fails every
+    export with "Invalid project id in name!"."""
+    env_vars = DeploymentConfig.from_env().runtime_env_vars
+
+    assert env_vars == {
+        "CLOUD_TRACE_ENABLED": "true",
+        "OTEL_EXPORTER_GCP_TRACE_PROJECT_ID": "test-project-123",
+    }

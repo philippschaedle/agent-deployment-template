@@ -9,7 +9,123 @@ MAJOR/MINOR/PATCH and how releases are tagged.
 
 ## [Unreleased]
 
+### Changed
+
+- **Retracted: "the observability layer has no destination in production."** An earlier draft of
+  this entry claimed `@instrument`, `log_event` and `redact_pii` wrote to a void once deployed,
+  because Agent Engine did not forward container stdout the way Cloud Run does, and added a
+  `google-cloud-logging` client handler to fix it. **That diagnosis was wrong and the change has
+  been reverted.** Agent Engine forwards stdout correctly, under
+  `aiplatform.googleapis.com/reasoning_engine_stdout`.
+
+  The evidence that produced the wrong conclusion — zero application logs after a confirmed
+  production tool call — was caused by the **`_Default` log sink being disabled in the GCP
+  project**, which discards every non-audit entry however it is written. The tell was that
+  *nothing* in that project had logged anything for 30 days, across five agents from three
+  teams, and that a direct `gcloud logging write` was accepted and then unreadable. With the
+  sink enabled, every event arrived twice — once via stdout, once via the added handler — which
+  is what proved the handler redundant. It and the `google-cloud-logging` dependency are gone,
+  and the stdout design the template started with stands. `read_logs.sh` and `CLAUDE.md` now
+  point at the sink as the first thing to check when logs go missing.
+
+- **BREAKING: deployed agents now run as `agent-engine-sa`, not the shared Reasoning Engine
+  Service Agent.** This is the visible half of the runtime-identity fix below, and it changes
+  the behaviour of existing generated projects on `cruft update`: `deploy.py` now always passes
+  a `service_account`, where before it passed none. The next deploy after an update fails with
+  `PermissionDenied` on `actAs` until the new IAM binding exists.
+
+  **Migration:** re-run `make setup-gcp ENV=<env>` before the next deploy — it adds the binding
+  and is safe to re-run. Then check that `agent-engine-sa` holds whatever roles the agent needs
+  at runtime, because the identity it runs under genuinely changes. To defer, pin the template
+  to the previous release rather than updating.
+
 ### Fixed
+
+- **`make logs` and `make traces` queried the wrong things, and tracing never worked at all.**
+  `read_logs.sh` filtered on `resource.type="aiplatform.googleapis.com/Endpoint"`, which is not
+  what an Agent Engine deployment uses. The real destination — confirmed against a live
+  deployment — is `aiplatform.googleapis.com/reasoning_engine_stdout` and `..._stderr`, where
+  Agent Engine forwards container stdout/stderr and parses each JSON line into a structured
+  `jsonPayload`. The script now reads those, scoped by `reasoning_engine_id`, because the log
+  names are shared by every reasoning engine in the project and `jsonPayload.agent_name` is
+  `root_agent` in every project generated from this template.
+
+  `read_traces.sh` was worse: it printed a **Cloud Logging** filter expression, labelled it a
+  Cloud Trace filter, and then opened the console — it never queried an API, so it could not
+  fail visibly. It is replaced by `read_traces.py`, which calls the Cloud Trace v1 API (there is
+  no `gcloud trace` command group) with `--since` / `--limit` / `--filter`, and whose argument
+  handling and rendering are unit-tested.
+
+  Tracing itself is new: nothing in the template had ever configured an exporter, so `make
+  traces` was aspirational. `@instrument` now opens an OpenTelemetry span per call, exported to
+  Cloud Trace, enabled per deployment by `CLOUD_TRACE_ENABLED`. The exporter is also passed
+  `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` explicitly, which is **not** optional: left to its own
+  `google.auth.default()` fallback it resolves no project inside the Agent Engine container and
+  fails every export with `INVALID_ARGUMENT: Invalid project id in name!`. Both are off by
+  default so a local `make dev` stays offline and free.
+
+- **`make setup-monitoring` could not be re-run.** The second run failed with
+  `INVALID_ARGUMENT: Update Dashboard should specify a non empty etag`: the script finds the
+  existing dashboard by display name and calls `dashboards update --config-from-file`, but the
+  API requires the dashboard's current `etag` and a checked-in `dashboard.json` cannot carry
+  one. That broke the only workflow the template offers for changing a dashboard — edit
+  `dashboard.json`, re-run — while the generated `CLAUDE.md` claimed re-running was safe. The
+  script now reads the live `etag` and injects it into a temporary copy of the config before
+  updating, and fails loudly if the `etag` cannot be read rather than letting the API reject
+  the call.
+- **Deployed agents never ran as the service account `setup_gcp.sh` provisions.**
+  `agent_engines.create`/`update` accept a `service_account` parameter and `deploy.py` did not
+  pass it, so — as the SDK documents — every agent deployed by this template ran as the
+  project's shared Reasoning Engine Service Agent, confirmed by reading `spec.service_account`
+  off a live deployment. The effect was that `setup_gcp.sh`'s central act was largely
+  theatre: it created `agent-engine-sa` and granted it `aiplatform.user`,
+  `logging.logWriter` and `cloudtrace.agent`, and the running agent never assumed that
+  identity — those grants only ever applied to the *caller* of `deploy.py`, while the real
+  runtime permissions came from a service agent nobody had configured. The least-privilege
+  story in the generated docs therefore described something that was not happening.
+  `deploy.py` now passes `service_account=$AGENT_ENGINE_SERVICE_ACCOUNT` when that variable is
+  set, and only when set, so `cruft update` cannot silently retarget the identity of a
+  resource created without one. `deploy.yml` passes the variable through, and a new "Runtime
+  identity" section in the generated `CLAUDE.md` spells out the difference between the deployer
+  and the runtime.
+
+  The service account is **derived, not configured**: its name is fixed by
+  `setup_gcp.sh`, so `DeploymentConfig` builds `agent-engine-sa@$GOOGLE_CLOUD_PROJECT` from the
+  project id, and `AGENT_ENGINE_SERVICE_ACCOUNT` survives only as an override for a renamed SA.
+  Restating a derived value in `.env` is just an opportunity for the two to drift. The staging
+  bucket now works the same way (`gs://$GOOGLE_CLOUD_PROJECT-agent-staging`), which also settles
+  an old inconsistency: `setup_gcp.sh` printed it without the `gs://` scheme while the docs showed
+  it with one — either spelling is now accepted and normalised.
+
+  Passing a real identity makes an IAM permission real too — the deployer needs
+  `roles/iam.serviceAccountUser` on that SA, where the old behaviour needed nothing — so
+  `setup_gcp.sh` grants it to both principals that actually deploy: the SA itself (how CI
+  authenticates) and whoever runs the bootstrap, read from `gcloud config get-value account`
+  and prefixed `user:` or `serviceAccount:` as appropriate. Granting only the former would
+  leave a first local `make deploy-dev` failing with `PermissionDenied` on `actAs` *after*
+  pickling and uploading the agent, with the fix buried in a doc sentence.
+
+  Still open, deliberately: `setup_gcp.sh` continues to mint a user-managed service-account
+  key on every run and never revokes it. Moving CI to Workload Identity Federation is tracked
+  separately, since it changes how `deploy.yml` authenticates.
+
+- **A renamed staging bucket was silently ignored in CI.** `setup_gcp.sh` now prints
+  `GCS_STAGING_BUCKET` as an optional GitHub Environment *variable*, alongside
+  `AGENT_ENGINE_SERVICE_ACCOUNT`, but `deploy.yml` still read it from `secrets`. Anyone who
+  renamed their bucket and followed those instructions got an empty value, and `deploy.py` fell
+  back to the derived `gs://$GOOGLE_CLOUD_PROJECT-agent-staging` without saying so. `deploy.yml`
+  now reads `vars.GCS_STAGING_BUCKET` in both the deploy and health-check steps. A bucket name is
+  not a credential, and storing it as a secret also meant GitHub masked it as `***` in the deploy
+  log — exactly where you want to read it when a staging upload fails.
+
+  **Migration:** only affects projects that set `GCS_STAGING_BUCKET` at all. If yours is the
+  default `<project>-agent-staging`, delete the secret and change nothing else. If you renamed the
+  bucket, move the value from an Environment secret to an Environment variable of the same name.
+
+  `AGENTS.md`'s environment table was also still describing the pre-derivation world — it listed
+  `GCS_STAGING_BUCKET` as required, omitted `AGENT_ENGINE_SERVICE_ACCOUNT`, `CLOUD_TRACE_ENABLED`,
+  `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` and `LITELLM_MODEL`, and named a secret set that no longer
+  matches `deploy.yml`. It now agrees with `CLAUDE.md` and `README.md`.
 
 - **`cruft create` left every generated project with a dirty working tree.**
   `hooks/post_gen_project.py` writes `.cruft.json` and commits it, and then cruft rewrites

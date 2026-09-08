@@ -1,9 +1,11 @@
 """Unit tests for agent/observability.py — no network, no GCP credentials required."""
 
 import json
+from contextlib import contextmanager
 
 import pytest
 
+from agent import observability
 from agent.observability import instrument, log_event, log_model_usage, redact_pii
 
 
@@ -169,3 +171,218 @@ def test_log_model_usage_noop_without_usage_metadata(monkeypatch):
     log_model_usage(FakeEvent())
 
     assert messages == []
+
+
+# --- Destination wiring -------------------------------------------------------
+#
+# Logs need no wiring: Agent Engine forwards container stdout to Cloud Logging, which
+# a live deployment confirmed. Traces do, since nothing forwards spans -- and the
+# exporter must stay off by default so a local `make dev` never writes to a real GCP
+# project.
+
+
+@pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on", " true "])
+def test_env_flag_recognises_truthy_values(monkeypatch, value):
+    monkeypatch.setenv("SOME_FLAG", value)
+
+    assert observability._env_flag("SOME_FLAG") is True
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off", "maybe"])
+def test_env_flag_treats_everything_else_as_off(monkeypatch, value):
+    monkeypatch.setenv("SOME_FLAG", value)
+
+    assert observability._env_flag("SOME_FLAG") is False
+
+
+def test_env_flag_absent_variable_is_off(monkeypatch):
+    monkeypatch.delenv("SOME_FLAG", raising=False)
+
+    assert observability._env_flag("SOME_FLAG") is False
+
+
+def test_tracer_is_not_built_by_default(monkeypatch):
+    monkeypatch.delenv("CLOUD_TRACE_ENABLED", raising=False)
+
+    assert observability._build_tracer() is None
+
+
+def test_tracer_build_failure_disables_spans_without_raising(monkeypatch, capsys):
+    monkeypatch.setenv("CLOUD_TRACE_ENABLED", "true")
+    monkeypatch.setattr(
+        "opentelemetry.sdk.trace.TracerProvider",
+        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("no exporter")),
+    )
+
+    assert observability._build_tracer() is None
+    assert "no exporter" in capsys.readouterr().err
+
+
+# --- Spans --------------------------------------------------------------------
+
+
+class FakeSpan:
+    """Records what @instrument does to a span, without an OTel SDK."""
+
+    def __init__(self):
+        self.attributes = {}
+        self.exceptions = []
+        self.status = None
+
+    def set_attribute(self, key, value):
+        self.attributes[key] = value
+
+    def record_exception(self, exc):
+        self.exceptions.append(exc)
+
+    def set_status(self, status):
+        self.status = status
+
+
+class FakeTracer:
+    def __init__(self):
+        self.spans = {}
+
+    @contextmanager
+    def start_as_current_span(self, name):
+        span = FakeSpan()
+        self.spans[name] = span
+        yield span
+
+
+@pytest.fixture
+def fake_tracer(monkeypatch):
+    tracer = FakeTracer()
+    monkeypatch.setattr(observability, "_TRACER", tracer)
+    return tracer
+
+
+def test_span_yields_none_when_tracing_is_disabled(monkeypatch):
+    monkeypatch.setattr(observability, "_TRACER", None)
+
+    with observability._span("anything") as span:
+        assert span is None
+
+
+def test_instrument_opens_a_span_named_after_the_function(fake_tracer):
+    @instrument
+    def add(a, b):
+        return a + b
+
+    assert add(1, 2) == 3
+    assert "add" in fake_tracer.spans
+
+
+def test_instrument_records_success_outcome_and_duration_on_the_span(fake_tracer):
+    @instrument
+    def add(a, b):
+        return a + b
+
+    add(1, 2)
+
+    attributes = fake_tracer.spans["add"].attributes
+    assert attributes["outcome"] == "success"
+    assert "duration_ms" in attributes
+
+
+def test_instrument_records_the_exception_on_the_span_and_reraises(fake_tracer):
+    @instrument
+    def boom():
+        raise ValueError("nope")
+
+    with pytest.raises(ValueError):
+        boom()
+
+    span = fake_tracer.spans["boom"]
+    assert span.attributes["outcome"] == "error"
+    assert [str(exc) for exc in span.exceptions] == ["nope"]
+    assert span.status is not None
+
+
+async def test_instrument_opens_a_span_for_async_functions_too(fake_tracer):
+    @instrument
+    async def fetch(x):
+        return x * 2
+
+    assert await fetch(5) == 10
+    assert fake_tracer.spans["fetch"].attributes["outcome"] == "success"
+
+
+def test_instrument_works_unchanged_when_tracing_is_disabled(monkeypatch):
+    """Spans are additive: the log events are the contract that must not regress."""
+    monkeypatch.setattr(observability, "_TRACER", None)
+    messages = []
+    monkeypatch.setattr(
+        "agent.observability.logger.info", lambda m: messages.append(json.loads(m))
+    )
+
+    @instrument
+    def add(a, b):
+        return a + b
+
+    assert add(1, 2) == 3
+    assert [m["event"] for m in messages] == ["add.start", "add.end"]
+
+
+def test_build_tracer_returns_a_usable_tracer(monkeypatch):
+    """Exercises the real OTel SDK wiring with a stand-in exporter; whether spans
+    actually arrive in Cloud Trace is only provable by a deploy."""
+    monkeypatch.setenv("CLOUD_TRACE_ENABLED", "true")
+
+    class FakeExporter:
+        def export(self, spans):
+            return None
+
+        def shutdown(self):
+            return None
+
+        def force_flush(self, timeout_millis=None):  # noqa: ARG002
+            return True
+
+    monkeypatch.setattr(
+        "opentelemetry.exporter.cloud_trace.CloudTraceSpanExporter",
+        lambda *a, **kw: FakeExporter(),
+    )
+
+    tracer = observability._build_tracer()
+
+    assert tracer is not None
+    with tracer.start_as_current_span("probe") as span:
+        assert span is not None
+
+
+def test_span_attribute_failure_is_reported_not_raised(capsys):
+    """A broken span must not turn a working tool call into a failure."""
+
+    class BrokenSpan:
+        def set_attribute(self, key, value):
+            raise RuntimeError("span is closed")
+
+    observability._set_span_attribute(BrokenSpan(), "outcome", "success")
+
+    assert "span is closed" in capsys.readouterr().err
+
+
+def test_span_error_recording_failure_is_reported_not_raised(capsys):
+    """Same reason: recording the error must never replace the original exception."""
+
+    class BrokenSpan:
+        def record_exception(self, exc):
+            raise RuntimeError("span is closed")
+
+    observability._record_span_error(BrokenSpan(), ValueError("original"))
+
+    assert "span is closed" in capsys.readouterr().err
+
+
+async def test_instrument_records_async_exception_on_the_span_and_reraises(fake_tracer):
+    @instrument
+    async def boom():
+        raise ValueError("nope")
+
+    with pytest.raises(ValueError):
+        await boom()
+
+    span = fake_tracer.spans["boom"]
+    assert span.attributes["outcome"] == "error"
+    assert [str(exc) for exc in span.exceptions] == ["nope"]

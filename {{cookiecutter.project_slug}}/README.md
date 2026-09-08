@@ -85,7 +85,7 @@ exactly what to configure and where `setup-gcp`'s output goes.
 | `make rollback REF=<tag> [ENV=prod\|dev]` | Redeploy a previous git ref against the existing Agent Engine resource |
 | `make health-check` | Standalone smoke test against the deployed Agent Engine resource (no fresh deploy) |
 | `make logs` | Stream Cloud Logging |
-| `make traces` | Open Cloud Trace in browser |
+| `make traces` | List this agent's Cloud Trace spans |
 | `make setup-gcp [ENV=dev\|prod]` | One-time GCP bootstrap (default: prod) |
 | `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
 | `make pre-commit` | Run all pre-commit hooks |
@@ -96,9 +96,12 @@ exactly what to configure and where `setup-gcp`'s output goes.
 |---|---|---|
 | `GOOGLE_CLOUD_PROJECT` | Deploy | GCP project ID |
 | `GOOGLE_CLOUD_LOCATION` | Deploy | Vertex AI region (default: `europe-west1`) |
-| `GCS_STAGING_BUCKET` | Deploy | GCS bucket for Agent Engine artefacts |
+| `GCS_STAGING_BUCKET` | No | Defaults to `gs://$GOOGLE_CLOUD_PROJECT-agent-staging`; `gs://` optional |
 | `AGENT_ENGINE_RESOURCE_NAME` | No | Existing resource to update (omit = create new) |
+| `AGENT_ENGINE_SERVICE_ACCOUNT` | No | Defaults to `agent-engine-sa@$GOOGLE_CLOUD_PROJECT…`; override only if renamed |
 | `MODEL_PROVIDER` | No | `google` \| `anthropic` \| `openai` \| `litellm` |
+| `CLOUD_TRACE_ENABLED` | No | Export a Cloud Trace span per tool call. Set automatically on deploy; off locally |
+| `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` | With tracing | Project the exporter writes to; set automatically on deploy |
 | `GOOGLE_API_KEY` | Local dev | Not needed on GCP (uses ADC) |
 | `ANTHROPIC_API_KEY` | If provider=anthropic | |
 | `OPENAI_API_KEY` | If provider=openai | |
@@ -118,32 +121,47 @@ Set `MODEL_PROVIDER` in `.env`:
 ## Logging and traces
 
 ```bash
-make logs     # stream Cloud Logging (requires GOOGLE_CLOUD_PROJECT in .env)
-make traces   # open Cloud Trace console in browser
+make logs     # read this agent's Cloud Logging entries (requires GOOGLE_CLOUD_PROJECT in .env)
+make traces   # list this agent's Cloud Trace spans
 ```
 
-Agent Engine forwards container stdout/stderr to Cloud Logging and emits request traces
-automatically — no log sink to configure. On top of that, `agent/observability.py` emits its own
-structured JSON events (tool calls, token usage) via `log_event`/`@instrument`; see
-[Observability](CLAUDE.md#observability) in `CLAUDE.md` for the field reference.
+`agent/observability.py` emits structured JSON events (tool calls, token usage) via
+`log_event`/`@instrument`, and a Cloud Trace span per instrumented call.
+
+Logs need no setup: Agent Engine forwards container stdout to Cloud Logging under
+`aiplatform.googleapis.com/reasoning_engine_stdout`, parsing each JSON line into a structured
+`jsonPayload`. Tracing does — `deployment/deploy.py` enables it on the deployed agent via
+`CLOUD_TRACE_ENABLED` and `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID`. It is off by default locally, so
+`make dev` just prints to stdout.
+
+**If logs seem missing, check the project's log sink before suspecting the agent.** A disabled
+`_Default` sink discards every non-audit entry regardless of how it was written:
+
+```bash
+gcloud logging sinks describe _Default --project=$GOOGLE_CLOUD_PROJECT
+```
+
+See [Observability](CLAUDE.md#observability) in `CLAUDE.md` for the field reference.
 
 ### Cloud Logging query examples
 
-Run these in [Logs Explorer](https://console.cloud.google.com/logs) or via `gcloud logging read`
-(the same filter `make logs` / `read_logs.sh` uses):
+Run these in [Logs Explorer](https://console.cloud.google.com/logs) or via `gcloud logging read`.
+Agent Engine writes every reasoning engine's output to a shared pair of log names, so scope by
+`reasoning_engine_id` to isolate one agent — `jsonPayload.agent_name` is `root_agent` in every
+project generated from this template and cannot tell them apart:
 
 ```bash
-# Every structured event this agent emits
-gcloud logging read 'jsonPayload.agent_name="root_agent"' --project=$GOOGLE_CLOUD_PROJECT --limit=50
+ENGINE_ID=$(cat .agent_engine_resource | sed 's#.*/##')
+STDOUT='logName="projects/'$GOOGLE_CLOUD_PROJECT'/logs/aiplatform.googleapis.com%2Freasoning_engine_stdout"'
 
-# Only failures (tool errors)
-gcloud logging read 'jsonPayload.agent_name="root_agent" AND severity=ERROR' --project=$GOOGLE_CLOUD_PROJECT
+# Every structured event this agent emits
+gcloud logging read "$STDOUT AND resource.labels.reasoning_engine_id=\"$ENGINE_ID\"" --project=$GOOGLE_CLOUD_PROJECT --limit=50
 
 # A specific tool's calls (start/end/error events all share its name as a prefix)
-gcloud logging read 'jsonPayload.event=~"^web_search\."' --project=$GOOGLE_CLOUD_PROJECT
+gcloud logging read "$STDOUT AND jsonPayload.event=~\"^web_search\.\"" --project=$GOOGLE_CLOUD_PROJECT
 
 # Token usage per request
-gcloud logging read 'jsonPayload.event="model.usage"' --project=$GOOGLE_CLOUD_PROJECT
+gcloud logging read "$STDOUT AND jsonPayload.event=\"model.usage\"" --project=$GOOGLE_CLOUD_PROJECT
 ```
 
 ## Monitoring and alerting

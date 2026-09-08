@@ -81,9 +81,30 @@ EXISTING_DASHBOARD="$(gcloud monitoring dashboards list \
   --filter="displayName=\"$DASHBOARD_NAME\"" \
   --format="value(name)" | head -n1)"
 if [ -n "$EXISTING_DASHBOARD" ]; then
+  # The Dashboards API rejects an update without the dashboard's current etag
+  # ("Update Dashboard should specify a non empty etag"), and dashboard.json is a
+  # checked-in template that cannot carry one. Read the live etag and inject it,
+  # with the resource name, into a temp copy of the config.
+  DASHBOARD_ETAG="$(gcloud monitoring dashboards describe "$EXISTING_DASHBOARD" \
+    --project="$PROJECT" \
+    --format="value(etag)")"
+  if [ -z "$DASHBOARD_ETAG" ]; then
+    echo "ERROR: could not read the etag of $EXISTING_DASHBOARD -- refusing to update," >&2
+    echo "       since the API would reject it. Check your permissions on the dashboard." >&2
+    exit 1
+  fi
+  tmp_dashboard="$(mktemp)"
+  python3 -c "
+import json, sys
+config = json.load(open(sys.argv[1]))
+config['name'] = sys.argv[2]
+config['etag'] = sys.argv[3]
+json.dump(config, open(sys.argv[4], 'w'))
+" "$MONITORING_DIR/dashboard.json" "$EXISTING_DASHBOARD" "$DASHBOARD_ETAG" "$tmp_dashboard"
   gcloud monitoring dashboards update "$EXISTING_DASHBOARD" \
     --project="$PROJECT" \
-    --config-from-file="$MONITORING_DIR/dashboard.json"
+    --config-from-file="$tmp_dashboard"
+  rm -f "$tmp_dashboard"
 else
   gcloud monitoring dashboards create \
     --project="$PROJECT" \

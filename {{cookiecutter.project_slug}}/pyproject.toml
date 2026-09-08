@@ -10,6 +10,10 @@ requires-python = ">={{cookiecutter.python_version}}"
 dependencies = [
     "google-adk>=1.0.0",
     "google-cloud-aiplatform[agent_engines]>=1.90.0",
+    # Trace export. Logs need no client library: Agent Engine forwards container
+    # stdout to Cloud Logging, so agent/observability.py just prints JSON lines.
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-gcp-trace>=1.6.0",
     "litellm>=1.50.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",

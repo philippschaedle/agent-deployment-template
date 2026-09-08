@@ -33,6 +33,7 @@ def deploy(env: str) -> None:
     logger.info("  Project:  %s", config.project)
     logger.info("  Location: %s", config.location)
     logger.info("  Bucket:   %s", config.staging_bucket)
+    logger.info("  Runtime SA: %s", config.service_account)
 
     vertexai.init(
         project=config.project,
@@ -40,9 +41,14 @@ def deploy(env: str) -> None:
         staging_bucket=config.staging_bucket,
     )
 
+    # Must stay in step with [project].dependencies in pyproject.toml: this is the
+    # list installed in the remote container, and a package missing here is an
+    # ImportError at runtime rather than a deploy-time failure.
     requirements = [
         "google-adk>=1.0.0",
         "google-cloud-aiplatform[agent_engines]>=1.90.0",
+        "opentelemetry-sdk>=1.20.0",
+        "opentelemetry-exporter-gcp-trace>=1.6.0",
         "litellm>=1.50.0",
         "pydantic>=2.0.0",
         "python-dotenv>=1.0.0",
@@ -54,6 +60,11 @@ def deploy(env: str) -> None:
     # alongside it (the prompts dir travels too for any runtime reads).
     extra_packages = ["agent", "prompts"]
 
+    # `service_account` is what makes the agent run as the identity setup_gcp.sh
+    # provisions -- omit it and Vertex silently falls back to the shared Reasoning
+    # Engine Service Agent, leaving that SA's IAM grants unused at runtime. Always
+    # sent, on create and update alike; DeploymentConfig derives it from the project
+    # when AGENT_ENGINE_SERVICE_ACCOUNT is not set.
     if config.resource_name:
         logger.info("  Updating: %s", config.resource_name)
         existing = agent_engines.get(config.resource_name)
@@ -62,6 +73,8 @@ def deploy(env: str) -> None:
             requirements=requirements,
             extra_packages=extra_packages,
             gcs_dir_name=config.gcs_dir_name,
+            env_vars=config.runtime_env_vars,
+            service_account=config.service_account,
         )
     else:
         logger.info("  Creating new Agent Engine resource...")
@@ -71,6 +84,8 @@ def deploy(env: str) -> None:
             display_name=config.agent_display_name,
             gcs_dir_name=config.gcs_dir_name,
             extra_packages=extra_packages,
+            env_vars=config.runtime_env_vars,
+            service_account=config.service_account,
         )
 
     resource_name = remote_agent.resource_name

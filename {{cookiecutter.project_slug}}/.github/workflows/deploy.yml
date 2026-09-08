@@ -51,8 +51,9 @@ jobs:
         env:
           GOOGLE_CLOUD_PROJECT: "{% raw %}${{ secrets.GOOGLE_CLOUD_PROJECT }}{% endraw %}"
           GOOGLE_CLOUD_LOCATION: "{% raw %}${{ vars.GOOGLE_CLOUD_LOCATION }}{% endraw %}"
-          GCS_STAGING_BUCKET: "{% raw %}${{ secrets.GCS_STAGING_BUCKET }}{% endraw %}"
+          GCS_STAGING_BUCKET: "{% raw %}${{ vars.GCS_STAGING_BUCKET }}{% endraw %}"
           AGENT_ENGINE_RESOURCE_NAME: "{% raw %}${{ vars.AGENT_ENGINE_RESOURCE_NAME }}{% endraw %}"
+          AGENT_ENGINE_SERVICE_ACCOUNT: "{% raw %}${{ vars.AGENT_ENGINE_SERVICE_ACCOUNT }}{% endraw %}"
           MODEL_PROVIDER: "{% raw %}${{ vars.MODEL_PROVIDER || 'google' }}{% endraw %}"
 
       - name: Health check
@@ -62,7 +63,7 @@ jobs:
         env:
           GOOGLE_CLOUD_PROJECT: "{% raw %}${{ secrets.GOOGLE_CLOUD_PROJECT }}{% endraw %}"
           GOOGLE_CLOUD_LOCATION: "{% raw %}${{ vars.GOOGLE_CLOUD_LOCATION }}{% endraw %}"
-          GCS_STAGING_BUCKET: "{% raw %}${{ secrets.GCS_STAGING_BUCKET }}{% endraw %}"
+          GCS_STAGING_BUCKET: "{% raw %}${{ vars.GCS_STAGING_BUCKET }}{% endraw %}"
 
       - name: Write deployment summary
         if: success()

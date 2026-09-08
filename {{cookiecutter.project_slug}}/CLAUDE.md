@@ -55,8 +55,8 @@ deployment/
   deploy.py            CLI: deploy to Agent Engine (create or update)
   scripts/
     setup_gcp.sh       one-time GCP bootstrap
-    read_logs.sh       stream Cloud Logging
-    read_traces.sh     open Cloud Trace in browser
+    read_logs.sh       read this agent's Cloud Logging entries
+    read_traces.py     list this agent's Cloud Trace spans
 tests/
   unit/                pure function tests — no GCP, no network
   evals/
@@ -82,8 +82,8 @@ tests/
 | `make deploy-prod` | Deploy to Agent Engine (prod) |
 | `make rollback REF=<tag> [ENV=prod\|dev]` | Redeploy a previous git ref against the existing Agent Engine resource |
 | `make health-check` | Standalone smoke test against the deployed Agent Engine resource (no fresh deploy) |
-| `make logs` | Stream Cloud Logging |
-| `make traces` | Open Cloud Trace in browser |
+| `make logs` | Read this agent's Cloud Logging entries |
+| `make traces` | List this agent's Cloud Trace spans |
 | `make setup-gcp` | One-time GCP bootstrap |
 | `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
 
@@ -123,11 +123,9 @@ runtime drives internally and which our code never touches in production:
   `<name>.end` (with `duration_ms`), or `<name>.error` (with the exception message) as JSON.
   Already applied to both tools in `agent/tools/example_tools.py`.
 - **`log_event(event_type, fields, severity="INFO")`** — emit one structured JSON line for
-  anything else worth recording. Cloud Logging parses a JSON stdout line into `jsonPayload`
-  automatically, and promotes reserved top-level keys — `severity` here — out of `jsonPayload`
-  into the LogEntry itself, so `severity=ERROR` is filterable directly in Logs Explorer. No
-  separate Cloud Logging sink is needed: Agent Engine forwards container stdout/stderr on its own,
-  the same way Cloud Run does.
+  anything else worth recording. `CloudLoggingHandler` parses that JSON line into a
+  `jsonPayload`, and the Python log level (chosen from `severity`) sets the LogEntry's own
+  severity field, so `severity=ERROR` is filterable directly in Logs Explorer.
 - **`redact_pii(value)`** — recursively redacts emails, SSNs, and credit-card-shaped numbers from
   strings, dicts, and lists. `log_event` and `@instrument` both redact fields before logging them,
   but it's a defence-in-depth measure, not a substitute for not logging sensitive fields in the
@@ -136,6 +134,39 @@ runtime drives internally and which our code never touches in production:
   that iterates the event stream itself (the promptfoo eval provider does); not reachable from
   Agent Engine's own request path for the same reason `@instrument` doesn't wrap `Runner.run_async`.
 
+### Destinations
+
+**Logs need no configuration.** Agent Engine forwards container stdout/stderr to Cloud Logging
+under `aiplatform.googleapis.com/reasoning_engine_stdout` and `..._stderr`, and parses a JSON
+stdout line into a structured `jsonPayload`. `make logs` reads exactly those, scoped to this
+agent by `reasoning_engine_id` — the log names are shared by every reasoning engine in the
+project.
+
+**Traces do need configuration**, because nothing forwards spans. `deployment/deploy.py` sets two
+variables on the deployed resource:
+
+| Variable | Effect |
+|---|---|
+| `CLOUD_TRACE_ENABLED` | Configure an OpenTelemetry tracer exporting to Cloud Trace; every `@instrument`ed call becomes a span named after the function. These are **child** spans — ADK wraps each request in an `invoke_workflow` root span — so `make traces` lists roots only; use `read_traces.py --spans` to expand them |
+| `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` | The project to export to. **Not optional** — without it the exporter falls back to `google.auth.default()`, which resolves no project inside the Agent Engine container, and every export fails with `INVALID_ARGUMENT: Invalid project id in name!` |
+
+Tracing is off by default so a local `make dev` writes only to stdout and needs no credentials;
+export `CLOUD_TRACE_ENABLED=true` to opt in locally. Telemetry never breaks a tool call: a missing
+library or unresolvable credentials is reported once on stderr and the tool runs on.
+
+> **If application logs seem to be missing, check the project's log sink first.**
+> A disabled `_Default` sink discards every non-audit entry however it was written — including
+> direct `gcloud logging write` calls — so it looks exactly like broken instrumentation. This
+> cost a full debugging session: the conclusion was "Agent Engine doesn't forward stdout", the
+> fix was a Cloud Logging client library, and the truth was one flag on a sink.
+>
+> ```bash
+> gcloud logging sinks describe _Default --project=$GOOGLE_CLOUD_PROJECT   # disabled: true is the bug
+> gcloud logging sinks update _Default --no-disabled --project=$GOOGLE_CLOUD_PROJECT
+> ```
+>
+> Sink changes take a few minutes to propagate, and entries written in the meantime are lost.
+
 ### Log fields
 
 Every event is one JSON object with these keys (exact set depends on which function emitted it):
@@ -143,7 +174,7 @@ Every event is one JSON object with these keys (exact set depends on which funct
 | Field | Emitted by | Description |
 |---|---|---|
 | `severity` | all | `INFO` or `ERROR`; a Cloud Logging reserved field, filterable as `severity=ERROR` |
-| `agent_name` | all | Always `root_agent` — matches the filter `deployment/scripts/read_logs.sh` uses |
+| `agent_name` | all | Always `root_agent`, in every project generated from this template — so it does **not** identify one agent in a shared project. `read_logs.sh` scopes by `reasoning_engine_id` instead |
 | `event` | all | Event name: `<tool>.start` / `.end` / `.error`, or `model.usage` |
 | `duration_ms` | `@instrument` | Wall-clock time for the call |
 | `outcome` | `@instrument` (`.end`) | Always `success` — failures are a separate `.error` event instead |
@@ -186,8 +217,11 @@ Set `MODEL_PROVIDER` in `.env`:
 |---|---|---|---|
 | `GOOGLE_CLOUD_PROJECT` | Deploy only | — | GCP project ID |
 | `GOOGLE_CLOUD_LOCATION` | Deploy only | `europe-west1` | Vertex AI region |
-| `GCS_STAGING_BUCKET` | Deploy only | — | GCS bucket for Agent Engine artefacts |
+| `GCS_STAGING_BUCKET` | No | `gs://$GOOGLE_CLOUD_PROJECT-agent-staging` | Override only if you renamed the bucket; the `gs://` scheme is optional |
 | `AGENT_ENGINE_RESOURCE_NAME` | No | — | Existing resource to update (omit = create new) |
+| `AGENT_ENGINE_SERVICE_ACCOUNT` | No | `agent-engine-sa@$GOOGLE_CLOUD_PROJECT…` | Override only if you renamed the SA — see [Runtime identity](#runtime-identity) |
+| `CLOUD_TRACE_ENABLED` | No | off | Export a Cloud Trace span per tool call; `deploy.py` sets it on the deployed agent |
+| `OTEL_EXPORTER_GCP_TRACE_PROJECT_ID` | With tracing | — | Project the span exporter writes to; `deploy.py` sets it from `GOOGLE_CLOUD_PROJECT` |
 | `MODEL_PROVIDER` | No | `google` | Provider selection |
 | `LITELLM_MODEL` | If provider=litellm | — | Full LiteLLM model string |
 | `ANTHROPIC_API_KEY` | If provider=anthropic | — | |
@@ -296,6 +330,66 @@ Exits `0` on success, `1` on failure, so it's safe to gate CI or a cron job on. 
 it as its own step right after deploying, reading the resource name from `.agent_engine_resource`
 so it works whether that deploy created a new resource or updated an existing one.
 
+## Runtime identity
+
+Two identities are involved in a deploy, and they are not the same thing:
+
+| Identity | What it is |
+|---|---|
+| The **deployer** | Whoever runs `deploy.py` — your user account locally, or `agent-engine-sa` via `GCP_SA_KEY` in `deploy.yml` |
+| The **runtime** | Whoever the deployed agent runs *as* when it serves a request |
+
+`agent_engines.create`/`update` accept a `service_account` parameter, and **if it is omitted the
+runtime is the project's shared Reasoning Engine Service Agent**
+(`service-<PROJECT_NUMBER>@gcp-sa-aiplatform-re...`), not the SA `setup_gcp.sh` creates. An
+earlier version of this template omitted it, which made the least-privilege story in these docs
+untrue: `agent-engine-sa`'s grants applied only to the *caller* of `deploy.py`, while the actual
+runtime permissions came from a service agent nobody had configured.
+
+`deploy.py` now always passes a `service_account`. You do not configure it: the SA name is fixed
+by `setup_gcp.sh`, so `DeploymentConfig` derives `agent-engine-sa@$GOOGLE_CLOUD_PROJECT` from the
+project id. `AGENT_ENGINE_SERVICE_ACCOUNT` exists only to override that if you renamed the SA. The
+staging bucket is derived the same way, for the same reason.
+
+> **Upgrading an existing project — breaking.** A project generated before this change deploys
+> with no `service_account`, so its agent runs as the shared service agent. After a `cruft update`
+> it starts passing one, and the next deploy fails with `PermissionDenied` on `actAs` until the
+> binding below exists.
+>
+> **Migration:** re-run `make setup-gcp ENV=<env>` before your next deploy — it adds the binding
+> and is safe to re-run. Note the first deploy afterwards also *changes the running agent's
+> identity*, so confirm the SA holds the roles the agent needs at runtime.
+>
+> Setting `AGENT_ENGINE_SERVICE_ACCOUNT=""` is not an escape hatch — an empty value falls back to
+> the derived SA. To stay on the old behaviour, pin the template to the previous version instead
+> of updating.
+
+### The actAs prerequisite
+
+Passing a real runtime identity makes an IAM permission real too: whoever deploys needs
+`roles/iam.serviceAccountUser` **on that service account** for Vertex to accept it. The old
+behaviour needed none, because it never passed a service account at all.
+
+`setup_gcp.sh` grants it to two principals, which covers both normal deploy paths:
+
+| Principal | Why |
+|---|---|
+| `agent-engine-sa` itself | how CI authenticates (`GCP_SA_KEY` in `deploy.yml`) |
+| whoever runs the bootstrap | the likely local deployer — picked up from `gcloud config get-value account` |
+
+Teammates who also deploy from their own machines need adding by hand:
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding agent-engine-sa@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com \
+  --member="user:them@example.com" --role=roles/iam.serviceAccountUser --project=$GOOGLE_CLOUD_PROJECT
+```
+
+Without the grant, the failure is a `PermissionDenied` on `actAs` that arrives *after* the agent
+has been pickled and uploaded — so if you see that mid-deploy, this is why.
+
+To check what a deployed resource actually runs as, read its `serviceAccount` field — `(none set)`
+means it is on the shared service agent.
+
 ## Monitoring & alerting
 
 Vertex AI Agent Engine emits platform-level metrics automatically under the
@@ -325,7 +419,10 @@ SLACK_CHANNEL="#agent-alerts" SLACK_BOT_TOKEN=xoxb-... \
 ```
 
 Safe to re-run: it updates the existing dashboard/policies/channels by display name instead of
-creating duplicates. Run once per GCP project (dev and prod separately, same as `setup-gcp`).
+creating duplicates. Editing `dashboard.json` and re-running is the intended way to change the
+dashboard. (The Dashboards API rejects an update without the dashboard's current `etag`, which a
+checked-in config file cannot carry, so `setup_monitoring.sh` reads the live `etag` and injects it
+before updating.) Run once per GCP project (dev and prod separately, same as `setup-gcp`).
 Preview a dashboard change first with `gcloud monitoring dashboards create --config-from-file=
 deployment/monitoring/dashboard.json --validate-only --project=$GOOGLE_CLOUD_PROJECT`.
 
@@ -356,10 +453,11 @@ environments share the same credentials:
 |---|---|---|---|
 | `GCP_SA_KEY` | Secret | Per environment (`dev`, `prod`) | Base64 service-account key, printed by `make setup-gcp ENV=<dev\|prod>` |
 | `GOOGLE_CLOUD_PROJECT` | Secret | Per environment | That environment's GCP project ID |
-| `GCS_STAGING_BUCKET` | Secret | Per environment | Staging bucket for Agent Engine artefacts |
 | `GOOGLE_CLOUD_LOCATION` | Variable | Per environment | Vertex AI region |
 | `MODEL_PROVIDER` | Variable | Per environment | `google` \| `anthropic` \| `openai` \| `litellm` |
 | `AGENT_ENGINE_RESOURCE_NAME` | Variable | Per environment | Existing resource to update; set after that environment's first deploy |
+| `GCS_STAGING_BUCKET` | Variable | Per environment | Optional — derived from the project id unless you renamed the bucket |
+| `AGENT_ENGINE_SERVICE_ACCOUNT` | Variable | Per environment | Optional — derived from the project id unless you renamed the SA |
 | `GOOGLE_API_KEY` | Secret | Repository-level | Used only by `eval.yml` (promptfoo), not per-environment  <!-- pragma: allowlist secret --> |
 
 Bootstrap each environment's GCP project with `make setup-gcp ENV=dev` / `make setup-gcp
