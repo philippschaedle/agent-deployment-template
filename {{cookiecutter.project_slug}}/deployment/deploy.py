@@ -11,6 +11,10 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from google.cloud.aiplatform_v1.types import SecretRef
 
 # Ensure the project root is on the path when run as a script
 # (python deployment/deploy.py puts deployment/ on sys.path, not the root).
@@ -60,6 +64,13 @@ def deploy(env: str) -> None:
     # alongside it (the prompts dir travels too for any runtime reads).
     extra_packages = ["agent", "prompts"]
 
+    # `env_vars` is declared by the SDK as Dict[str, str | SecretRef]. A plain
+    # dict[str, str] is not assignable to it because a dict's value type is
+    # invariant, so pyright rejects the call even though every value we pass is a
+    # str. The cast states the intent without widening runtime_env_vars itself,
+    # which keeps deployment/config.py free of any SDK import.
+    env_vars = cast("dict[str, str | SecretRef]", config.runtime_env_vars)
+
     # `service_account` is what makes the agent run as the identity setup_gcp.sh
     # provisions -- omit it and Vertex silently falls back to the shared Reasoning
     # Engine Service Agent, leaving that SA's IAM grants unused at runtime. Always
@@ -73,7 +84,7 @@ def deploy(env: str) -> None:
             requirements=requirements,
             extra_packages=extra_packages,
             gcs_dir_name=config.gcs_dir_name,
-            env_vars=config.runtime_env_vars,
+            env_vars=env_vars,
             service_account=config.service_account,
         )
     else:
@@ -84,7 +95,7 @@ def deploy(env: str) -> None:
             display_name=config.agent_display_name,
             gcs_dir_name=config.gcs_dir_name,
             extra_packages=extra_packages,
-            env_vars=config.runtime_env_vars,
+            env_vars=env_vars,
             service_account=config.service_account,
         )
 

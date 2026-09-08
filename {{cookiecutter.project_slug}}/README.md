@@ -59,7 +59,15 @@ make eval                 # promptfoo red-team evaluation
 
 ### Deploy to GCP
 
+Deploying from your machine needs both `gcloud` credential stores: the CLI login and
+Application Default Credentials. `gcloud auth login` does **not** refresh ADC, and
+`vertexai.init()` reads ADC — with only the first, a deploy fails partway with a
+`RefreshError`.
+
 ```bash
+gcloud auth login
+gcloud auth application-default login
+
 make setup-gcp ENV=dev    # one-time GCP bootstrap for the dev project (creates SA, bucket, key)
 make setup-gcp ENV=prod   # same, for the prod project (ENV defaults to prod if omitted)
 make deploy-dev           # deploy to dev Agent Engine resource

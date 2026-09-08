@@ -18,9 +18,13 @@ uv run pre-commit install --hook-type commit-msg
 make dev                      # run agent at http://localhost:8000
 ```
 
-One-time GCP setup (required before first deploy):
+One-time GCP setup (required before first deploy). Both auth commands are needed —
+`gcloud auth login` does not refresh Application Default Credentials, which is what
+`vertexai.init()` reads, and a deploy without ADC fails partway with a `RefreshError`:
 
 ```bash
+gcloud auth login
+gcloud auth application-default login
 make setup-gcp                # creates service account, bucket, prints GitHub secrets to add
 ```
 
@@ -142,8 +146,7 @@ Set `MODEL_PROVIDER` in `.env`:
 | `eval.yml` | PR to main | promptfoo red-team (90% pass threshold) |
 | `deploy.yml` | push to main | deploy to Agent Engine prod |
 
-Required GitHub Environment secrets: `GCP_SA_KEY`, `GOOGLE_CLOUD_PROJECT` (plus a repository-level
-`GOOGLE_API_KEY` for `eval.yml`)  <!-- pragma: allowlist secret -->
+Required GitHub Environment secrets: `GCP_SA_KEY`, `GOOGLE_CLOUD_PROJECT`, plus a repository-level `GOOGLE_API_KEY` for `eval.yml`.  <!-- pragma: allowlist secret -->
 Required GitHub Environment variables: `GOOGLE_CLOUD_LOCATION`, `MODEL_PROVIDER`,
 `AGENT_ENGINE_RESOURCE_NAME` (after first deploy). `GCS_STAGING_BUCKET` and
 `AGENT_ENGINE_SERVICE_ACCOUNT` are variables too, but only needed to override the values

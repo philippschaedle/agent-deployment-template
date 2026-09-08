@@ -29,6 +29,12 @@ make dev   # opens http://localhost:8000
 For GCP deployment (one-time):
 
 ```bash
+# Deploying locally needs BOTH credential stores. `gcloud auth login` does not
+# refresh Application Default Credentials, and `vertexai.init()` reads ADC — so
+# logging in only to the CLI fails partway through a deploy with a RefreshError.
+gcloud auth login
+gcloud auth application-default login
+
 make setup-gcp   # creates SA, enables APIs, generates key for CI
 ```
 
@@ -73,6 +79,7 @@ tests/
 | `make dev` | Run agent locally at http://localhost:8000 |
 | `make test` | Unit tests with coverage |
 | `make test-unit` | Unit tests only, verbose |
+| `make test-integration` | Integration tests only |
 | `make eval` | promptfoo red-team evaluation |
 | `make lint` | ruff lint check |
 | `make format` | ruff format |
@@ -86,6 +93,8 @@ tests/
 | `make traces` | List this agent's Cloud Trace spans |
 | `make setup-gcp` | One-time GCP bootstrap |
 | `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
+| `make clean` | Remove caches, coverage output and build artefacts |
+| `make help` | List every target with its description |
 
 ## How to add a tool
 

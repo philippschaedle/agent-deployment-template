@@ -109,6 +109,15 @@ MAJOR/MINOR/PATCH and how releases are tagged.
   key on every run and never revokes it. Moving CI to Workload Identity Federation is tracked
   separately, since it changes how `deploy.yml` authenticates.
 
+- **Local deploys needed `gcloud auth application-default login` and no generated doc said
+  so.** `vertexai.init()` reads Application Default Credentials, which `gcloud auth login` does
+  not refresh — so a correctly logged-in user got a `RefreshError` partway through their first
+  `make deploy-dev`, after the agent had already been pickled and uploaded. Both commands are
+  now in the deploy prerequisites in `README.md`, `CLAUDE.md` and `AGENTS.md`.
+- **Three real make targets were undocumented.** `make test-integration`, `make clean` and
+  `make help` exist in the generated `Makefile` but appeared in no table, so the documented
+  target list was a subset of the real one. Added to `CLAUDE.md`.
+
 - **A renamed staging bucket was silently ignored in CI.** `setup_gcp.sh` now prints
   `GCS_STAGING_BUCKET` as an optional GitHub Environment *variable*, alongside
   `AGENT_ENGINE_SERVICE_ACCOUNT`, but `deploy.yml` still read it from `secrets`. Anyone who
