@@ -84,6 +84,7 @@ exactly what to configure and where `setup-gcp`'s output goes.
 |---|---|
 | `make dev` | Run agent locally at http://localhost:8000 |
 | `make test` | Unit tests with coverage |
+| `make test-integration` | Integration tests only |
 | `make eval` | Prompt security evaluation (promptfoo) |
 | `make lint` | Ruff lint check |
 | `make format` | Ruff formatter |
@@ -97,6 +98,8 @@ exactly what to configure and where `setup-gcp`'s output goes.
 | `make setup-gcp [ENV=dev\|prod]` | One-time GCP bootstrap (default: prod) |
 | `make setup-monitoring` | One-time Cloud Monitoring dashboard + alert policy bootstrap |
 | `make pre-commit` | Run all pre-commit hooks |
+| `make clean` | Remove caches, coverage output and build artefacts |
+| `make help` | List every target with its description |
 
 ## Environment variables
 
